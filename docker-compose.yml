@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: uamp-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEON_DATABASE_URL=${NEON_DATABASE_URL}
+      - PORT=3000
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-uamp-docker-secret}
+      - JWT_EXPIRES_IN=7d
+      - CORS_ORIGIN=http://localhost,http://localhost:80
+      - AWS_ENDPOINT_URL_S3=${AWS_ENDPOINT_URL_S3}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-uamp-exam-storage}
+    env_file:
+      - ./.docker.env
+    networks:
+      - uamp-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./uamp-angular
+      dockerfile: Dockerfile
+    container_name: uamp-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - uamp-network
+    restart: unless-stopped
+
+networks:
+  uamp-network:
+    driver: bridge
