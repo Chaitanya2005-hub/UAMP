@@ -6,6 +6,14 @@ export const adminRoutes: Routes = [
     loadComponent: () => import('./approvals/approvals.component').then(m => m.ApprovalsComponent)
   },
   { 
+    path: 'exams', 
+    loadComponent: () => import('./manage-exams/manage-exams.component').then(m => m.ManageExamsComponent)
+  },
+  { 
+    path: 'schedule', 
+    loadComponent: () => import('../teacher/exam-schedule/exam-schedule.component').then(m => m.ExamScheduleComponent)
+  },
+  { 
     path: 'live-audit', 
     loadComponent: () => import('./live-audit-dashboard/live-audit-dashboard.component').then(m => m.LiveAuditDashboardComponent)
   },

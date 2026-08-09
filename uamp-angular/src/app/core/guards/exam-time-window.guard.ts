@@ -16,7 +16,7 @@ export const examTimeWindowGuard: CanActivateFn = async (route: ActivatedRouteSn
     firstValueFrom(serverTime.now()),
   ]);
 
-  if (serverNow < new Date(exam.scheduledStart)) {
+  if (exam.status !== 'live' || serverNow < new Date(exam.scheduledStart)) {
     return router.createUrlTree(['/student/exam', examId, 'lobby'], {
       queryParams: { reason: 'not_started' },
     });

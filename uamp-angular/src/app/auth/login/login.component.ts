@@ -16,7 +16,7 @@ import { AuthService } from '../../core/services/auth.service';
           <div class="auth-header">
             <div class="auth-logo">
               <span class="logo-icon">🎓</span>
-              <span class="logo-text">UAMP</span>
+              <span class="logo-text">University Assessment and Mastery Portal</span>
             </div>
             <h1>Welcome Back</h1>
             <p>Sign in to your University Assessment Portal</p>
@@ -212,11 +212,14 @@ export class LoginComponent {
       next: (response) => {
         this.isLoading.set(false);
         const role = response.user.role;
-        this.router.navigate([`/${role}/dashboard`]);
+        // Each role module owns its default landing route. Only the student
+        // module has a concrete /dashboard route; admin and teacher modules
+        // redirect from their module root to their own landing pages.
+        this.router.navigate([`/${role}`]);
       },
       error: (err) => {
         this.isLoading.set(false);
-        this.errorMessage.set(err.message || 'Invalid credentials. Please try again.');
+        this.errorMessage.set(err.error?.error || err.message || 'Invalid credentials. Please try again.');
       },
     });
   }

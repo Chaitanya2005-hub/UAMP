@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-intervention-controls',
@@ -12,7 +13,7 @@ import { FormsModule } from '@angular/forms';
         <div class="controls-header">
           <h2>Intervention Controls</h2>
           <div class="header-controls">
-            <select class="exam-select" [(ngModel)]="selectedExam">
+            <select class="exam-select" [(ngModel)]="selectedExam" (ngModelChange)="loadStudents()">
               <option value="">Select Exam</option>
               <option *ngFor="let exam of activeExams" [value]="exam.id">
                 {{ exam.title }} - {{ exam.course }}
@@ -496,21 +497,21 @@ import { FormsModule } from '@angular/forms';
     }
   `]
 })
-export class InterventionControlsComponent {
+export class InterventionControlsComponent implements OnInit {
   selectedExam = '';
   searchQuery = '';
   adhocStudentId = '';
   adhocReason = '';
-  activeExams = [
-    { id: '1', title: 'Midterm Exam', course: 'CS201' },
-    { id: '2', title: 'Quiz 3', course: 'CS301' }
-  ];
-  students = [
-    { id: '1', name: 'John Doe', enrollmentNumber: 'EN2021001', status: 'active' },
-    { id: '2', name: 'Jane Smith', enrollmentNumber: 'EN2021002', status: 'warning' },
-    { id: '3', name: 'Bob Johnson', enrollmentNumber: 'EN2021003', status: 'critical' },
-    { id: '4', name: 'Alice Williams', enrollmentNumber: 'EN2021004', status: 'active' }
-  ];
+  activeExams: any[] = [];
+  students: any[] = [];
+
+  constructor(private http: HttpClient) {}
+
+  ngOnInit(): void { this.http.get<any[]>('/api/exams/active').subscribe(exams => this.activeExams = exams); }
+
+  loadStudents(): void {
+    if (this.selectedExam) this.http.get<any[]>(`/api/exams/${this.selectedExam}/students`).subscribe(students => this.students = students);
+  }
 
   get filteredStudents() {
     if (!this.searchQuery) return this.students;
@@ -522,7 +523,7 @@ export class InterventionControlsComponent {
   }
 
   sendWarning(student: any): void {
-    console.log('Sending warning to:', student.id);
+    if (student.submissionId) this.http.post(`/api/submissions/${student.submissionId}/warn`, { message: 'Warning issued by administrator' }).subscribe(() => this.loadStudents());
   }
 
   sendMessage(student: any): void {
@@ -531,7 +532,7 @@ export class InterventionControlsComponent {
 
   forceSubmit(student: any): void {
     if (confirm(`Are you sure you want to force submit ${student.name}'s exam?`)) {
-      console.log('Force submitting:', student.id);
+      if (student.submissionId) this.http.post(`/api/submissions/${student.submissionId}/force-submit`, {}).subscribe(() => this.loadStudents());
     }
   }
 

@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 export const teacherRoutes: Routes = [
+  { path: 'schedule', loadComponent: () => import('./exam-schedule/exam-schedule.component').then(m => m.ExamScheduleComponent) },
   {
     path: 'question-paper',
     children: [

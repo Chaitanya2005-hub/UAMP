@@ -9,13 +9,14 @@ async function setupTestData() {
 
     // 1. Create institution
     console.log('📚 Creating institution...');
-    const institution = await sql`
+    await sql`
       INSERT INTO institutions (name, code)
       VALUES ('Test University', 'TU001')
       ON CONFLICT (code) DO NOTHING
-      RETURNING id
     `;
-    const institutionId = institution[0]?.id || '00000000-0000-0000-0000-000000000000';
+    const institution = await sql`SELECT id FROM institutions WHERE code = 'TU001' LIMIT 1`;
+    if (!institution[0]) throw new Error('Unable to locate the Test University institution.');
+    const institutionId = institution[0].id;
     console.log('✅ Institution created:', institutionId);
 
     // 2. Create admin user

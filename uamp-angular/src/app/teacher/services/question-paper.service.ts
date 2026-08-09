@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface QuestionPaper {
   id: string;
@@ -35,7 +36,7 @@ export interface Question {
   providedIn: 'root'
 })
 export class QuestionPaperService {
-  private apiUrl = '/api/question-papers';
+  private apiUrl = `${environment.apiBaseUrl}/question-papers`;
 
   constructor(private http: HttpClient) {}
 
@@ -92,11 +93,11 @@ export class QuestionPaperService {
   }
 
   updateQuestion(questionId: string, question: Partial<Question>): Observable<Question> {
-    return this.http.put<Question>(`/api/questions/${questionId}`, question);
+    return this.http.put<Question>(`${environment.apiBaseUrl}/questions/${questionId}`, question);
   }
 
   deleteQuestion(questionId: string): Observable<void> {
-    return this.http.delete<void>(`/api/questions/${questionId}`);
+    return this.http.delete<void>(`${environment.apiBaseUrl}/questions/${questionId}`);
   }
 
   reorderQuestions(paperId: string, questionIds: string[]): Observable<void> {

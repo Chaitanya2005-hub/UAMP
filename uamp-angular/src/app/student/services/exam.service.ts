@@ -22,8 +22,8 @@ export class ExamService {
     return this.http.get<Submission[]>(`${environment.apiBaseUrl}/student/submissions`);
   }
 
-  startExam(examId: string): Observable<{ submissionId: string; sessionSecret: string; questions: any[] }> {
-    return this.http.post<any>(`${this.baseUrl}/${examId}/start`, {});
+  beginAttempt(examId: string): Observable<{ submissionId: string; sessionSecret: string; questions: any[] }> {
+    return this.http.post<any>(`${this.baseUrl}/${examId}/attempt`, {});
   }
 
   syncAnswers(submissionId: string, answers: Record<string, unknown>): Observable<{ synced: boolean }> {

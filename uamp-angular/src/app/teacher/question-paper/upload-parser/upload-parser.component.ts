@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
+import { QuestionPaperService } from '../../services/question-paper.service';
 
 @Component({
   selector: 'app-upload-parser',
@@ -10,8 +11,8 @@ import { FormsModule } from '@angular/forms';
   template: `
     <div class="upload-parser-container">
       <div class="glass-panel">
-        <h2>Upload Question Paper</h2>
-        <p class="subtitle">Upload DOCX or PDF files to parse questions automatically</p>
+        <h2>Upload Question Paper Spreadsheet</h2>
+        <p class="subtitle">Upload a CSV spreadsheet formatted template to parse questions automatically</p>
 
         <form [formGroup]="uploadForm" (ngSubmit)="onSubmit()">
           <div class="form-group">
@@ -48,7 +49,7 @@ import { FormsModule } from '@angular/forms';
                 id="file" 
                 type="file" 
                 formControlName="file" 
-                accept=".docx,.pdf"
+                accept=".csv"
                 (change)="onFileSelect($event)"
               />
               <div class="file-drop-content">
@@ -65,7 +66,13 @@ import { FormsModule } from '@angular/forms';
             </div>
           </div>
 
-          <div class="form-actions">
+          <div class="form-actions" style="flex-wrap: wrap; gap: 1rem;">
+            <div class="template-section" style="margin-right: auto; display: flex; align-items: center; gap: 0.5rem;">
+              <span style="color: #94a3b8; font-size: 0.875rem;">Download Templates:</span>
+              <button type="button" class="btn-template" (click)="onDownloadTemplate('mcq')">MCQ</button>
+              <button type="button" class="btn-template" (click)="onDownloadTemplate('written')">Written Q&A</button>
+              <button type="button" class="btn-template" (click)="onDownloadTemplate('coding')">Coding</button>
+            </div>
             <button type="button" class="btn-secondary" (click)="onCancel()">Cancel</button>
             <button type="submit" class="btn-primary" [disabled]="uploadForm.invalid || isUploading">
               {{ isUploading ? 'Uploading...' : 'Upload & Parse' }}
@@ -144,7 +151,7 @@ import { FormsModule } from '@angular/forms';
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 8px;
-      color: #e6ebf5;
+      color: #0048d7ff;
       font-size: 1rem;
       transition: all 0.15s ease;
     }
@@ -316,6 +323,23 @@ import { FormsModule } from '@angular/forms';
       gap: 1rem;
       justify-content: flex-end;
     }
+
+    .btn-template {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-template:hover {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: #6366f1;
+      transform: translateY(-1px);
+    }
   `]
 })
 export class UploadParserComponent {
@@ -330,7 +354,11 @@ export class UploadParserComponent {
   ];
   parsedQuestions: any[] = [];
 
-  constructor(private fb: FormBuilder) {
+  constructor(
+    private fb: FormBuilder,
+    private questionPaperService: QuestionPaperService,
+    private cdr: ChangeDetectorRef
+  ) {
     this.uploadForm = this.fb.group({
       title: ['', Validators.required],
       course: ['', Validators.required],
@@ -365,12 +393,13 @@ export class UploadParserComponent {
   }
 
   handleFile(file: File): void {
-    const validTypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/pdf'];
-    if (validTypes.includes(file.type)) {
+    const isCsv = file.name.toLowerCase().endsWith('.csv') || 
+                  ['text/csv', 'application/vnd.ms-excel'].includes(file.type);
+    if (isCsv) {
       this.selectedFile = file;
       this.uploadForm.patchValue({ file });
     } else {
-      alert('Please upload a DOCX or PDF file');
+      alert('Please upload a CSV file');
     }
   }
 
@@ -382,42 +411,55 @@ export class UploadParserComponent {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   }
 
+  onDownloadTemplate(type: 'mcq' | 'written' | 'coding'): void {
+    let templateContent = '';
+    let filename = '';
+
+    if (type === 'mcq') {
+      const headers = 'Question,Marks,Option A,Option B,Option C,Option D,Correct Option\r\n';
+      const sample = '"What is the complexity of binary search?",2,"O(n)","O(log n)","O(n^2)","O(1)",B\r\n';
+      templateContent = headers + sample;
+      filename = 'UAMP_MCQ_Template.csv';
+    } else if (type === 'written') {
+      const headers = 'Written Question,Marks\r\n';
+      const sample = '"Explain the MVC architecture model.",5\r\n';
+      templateContent = headers + sample;
+      filename = 'UAMP_Written_QA_Template.csv';
+    } else if (type === 'coding') {
+      const headers = 'Coding Question,Marks\r\n';
+      const sample = '"Write a function in Python to check if a number is prime.",10\r\n';
+      templateContent = headers + sample;
+      filename = 'UAMP_Coding_Template.csv';
+    }
+
+    const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
+
   onSubmit(): void {
     if (this.uploadForm.valid && this.selectedFile) {
       this.isUploading = true;
-      // Simulate file upload and parsing
-      setTimeout(() => {
-        this.parsedQuestions = this.generateMockParsedQuestions();
-        this.isUploading = false;
-      }, 2000);
-    }
-  }
+      const courseId = this.uploadForm.get('course')?.value;
 
-  generateMockParsedQuestions(): any[] {
-    return [
-      {
-        type: 'mcq_single',
-        prompt: 'What is the time complexity of binary search?',
-        marks: 2,
-        options: [
-          { text: 'O(n)', isCorrect: false },
-          { text: 'O(log n)', isCorrect: true },
-          { text: 'O(n²)', isCorrect: false },
-          { text: 'O(1)', isCorrect: false }
-        ]
-      },
-      {
-        type: 'mcq_single',
-        prompt: 'Which data structure uses LIFO?',
-        marks: 2,
-        options: [
-          { text: 'Queue', isCorrect: false },
-          { text: 'Stack', isCorrect: true },
-          { text: 'Linked List', isCorrect: false },
-          { text: 'Tree', isCorrect: false }
-        ]
-      }
-    ];
+      this.questionPaperService.uploadAndParse(this.selectedFile, courseId).subscribe({
+        next: (response) => {
+          this.parsedQuestions = response.questions as any[];
+          this.isUploading = false;
+          this.cdr.detectChanges();
+        },
+        error: (error) => {
+          console.error('Upload failed', error);
+          alert('Failed to upload and parse question paper.');
+          this.isUploading = false;
+          this.cdr.detectChanges();
+        }
+      });
+    }
   }
 
   onEditParsed(): void {

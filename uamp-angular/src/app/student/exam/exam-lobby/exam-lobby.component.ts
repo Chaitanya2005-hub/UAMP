@@ -5,7 +5,7 @@ import { GlassPanelComponent } from '../../../shared/components/glass-panel/glas
 import { CountdownPipe } from '../../../shared/pipes/countdown.pipe';
 import { ExamService } from '../../services/exam.service';
 import { Exam } from '../../../core/models';
-import { interval, Subscription } from 'rxjs';
+import { Subscription, switchMap, timer } from 'rxjs';
 
 @Component({
   selector: 'app-exam-lobby',
@@ -208,10 +208,6 @@ export class ExamLobbyComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const examId = this.route.snapshot.paramMap.get('examId')!;
-    this.examService.getExam(examId).subscribe({
-      next: (exam: any) => this.exam.set(exam),
-    });
-
     // Run pre-checks
     this.checks.stableConnection = navigator.onLine;
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
@@ -222,22 +218,23 @@ export class ExamLobbyComponent implements OnInit, OnDestroy {
       .catch(() => (this.checks.cameraReady = false));
     this.checks.fullscreenReady = !!document.documentElement.requestFullscreen;
 
-    // Tick every second to update countdown and check if exam started
-    this.tickSub = interval(1000).subscribe(() => {
-      const exam = this.exam();
-      if (exam) {
+    // Refresh the timetable so an admin's force-start becomes available in the lobby.
+    this.tickSub = timer(0, 3000).pipe(
+      switchMap(() => this.examService.getExam(examId))
+    ).subscribe({
+      next: exam => {
+        this.exam.set(exam);
         const now = Date.now();
-        const start = new Date(exam.scheduledStart).getTime();
-        const end = new Date(exam.scheduledEnd).getTime();
-        this.canStart.set(now >= start && now < end);
-      }
+        this.canStart.set(exam.status === 'live' && now >= new Date(exam.scheduledStart).getTime() && now < new Date(exam.scheduledEnd).getTime());
+      },
+      error: () => this.canStart.set(false)
     });
   }
 
   startExam(): void {
     const exam = this.exam();
     if (exam) {
-      this.router.navigate(['/student/exam', exam.id, 'attempt']);
+      this.router.navigate(['/student/exam', exam.id, 'runner']);
     }
   }
 

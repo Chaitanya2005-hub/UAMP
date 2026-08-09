@@ -15,7 +15,7 @@ import { BloomMasteryPoint, ExamSlot } from '../../core/models';
     <div class="container">
       <div class="page-header">
         <h1>Welcome back, {{ userName() }} 👋</h1>
-        <p>Your academic progress at a glance</p>
+        <p>Your exam timetable, alerts, and active assessments.</p>
       </div>
 
       <!-- Stats Grid -->
@@ -72,7 +72,7 @@ import { BloomMasteryPoint, ExamSlot } from '../../core/models';
         <!-- Upcoming Exams -->
         <div class="dashboard-section">
           <app-glass-panel [hoverable]="false" padding="32px">
-            <h2 class="section-title">Upcoming Exams</h2>
+            <h2 class="section-title">My Exams</h2>
             <div class="exam-list" *ngIf="upcomingExams().length > 0; else noExams">
               <div
                 class="exam-item glass-panel metric-card"
@@ -99,7 +99,7 @@ import { BloomMasteryPoint, ExamSlot } from '../../core/models';
             </div>
             <ng-template #noExams>
               <div class="empty-state">
-                <p>No upcoming exams scheduled.</p>
+                <p>No exams have been assigned to this student yet. Once an admin or teacher publishes a timetable, it will appear here with an Enter Lobby button.</p>
               </div>
             </ng-template>
           </app-glass-panel>
@@ -268,21 +268,7 @@ export class DashboardComponent implements OnInit {
         const avg = data.reduce((sum, d) => sum + d.masteryPct, 0) / (data.length || 1);
         this.averageScore.set(Math.round(avg));
       },
-      error: () => {
-        // Use mock data for demo
-        const mock: BloomMasteryPoint[] = [
-          { axis: 'Remember', masteryPct: 85 },
-          { axis: 'Understand', masteryPct: 72 },
-          { axis: 'Apply', masteryPct: 68 },
-          { axis: 'Analyze', masteryPct: 55 },
-          { axis: 'Evaluate', masteryPct: 45 },
-          { axis: 'Create', masteryPct: 38 },
-        ];
-        this.masteryData.set(mock);
-        this.weakAreas.set(mock.filter(d => d.masteryPct < 60));
-        this.strongestArea.set('Remember');
-        this.averageScore.set(60);
-      },
+      error: () => { this.masteryData.set([]); this.weakAreas.set([]); this.strongestArea.set('—'); this.averageScore.set(0); },
     });
 
     this.examService.getMyExams().subscribe({

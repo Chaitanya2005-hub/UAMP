@@ -1,1 +1,47 @@
-<router-outlet></router-outlet>
+@if (authService.authenticated()) {
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="menu-toggle" type="button" (click)="sidebarOpen.set(!sidebarOpen())" aria-label="Toggle navigation">☰</button>
+      <a class="brand" [routerLink]="['/' + authService.role()]" (click)="closeSidebar()">
+        <span class="brand-mark">U</span>
+        <span>UAMP</span>
+      </a>
+      <div class="topbar-spacer"></div>
+      <div class="notifications-wrap">
+        <button class="notification-button" type="button" (click)="toggleNotifications()">Alerts @if (unreadNotifications()) { <span>{{ unreadNotifications() }}</span> }</button>
+        @if (notificationsOpen()) {
+          <div class="notifications-panel">
+            <strong>Notifications</strong>
+            @for (item of notifications(); track item.id) {
+              <button type="button" [class.unread]="!item.readAt" (click)="markRead(item)"><b>{{ item.title }}</b><small>{{ item.message }}</small></button>
+            } @empty { <p>No notifications yet.</p> }
+          </div>
+        }
+      </div>
+      <div class="user-summary">
+        <span class="user-name">{{ authService.user()?.fullName }}</span>
+        <span class="user-role">{{ authService.role() }}</span>
+      </div>
+      <button class="logout-button" type="button" (click)="logout()">Sign out</button>
+    </header>
+
+    <div class="shell-body">
+      <aside class="sidebar" [class.sidebar--open]="sidebarOpen()">
+        <div class="sidebar-title">{{ roleLabel(authService.role()) }}</div>
+        <nav>
+          @for (item of navItems(authService.role()); track item.link) {
+            <a [routerLink]="item.link" routerLinkActive="nav-link--active" class="nav-link" (click)="closeSidebar()">
+              <span class="nav-icon">{{ item.icon }}</span>{{ item.label }}
+            </a>
+          }
+        </nav>
+      </aside>
+      @if (sidebarOpen()) {
+        <button class="sidebar-backdrop" type="button" aria-label="Close navigation" (click)="closeSidebar()"></button>
+      }
+      <main class="page-content"><router-outlet></router-outlet></main>
+    </div>
+  </div>
+} @else {
+  <router-outlet></router-outlet>
+}

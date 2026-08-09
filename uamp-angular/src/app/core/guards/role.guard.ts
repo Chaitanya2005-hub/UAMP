@@ -16,7 +16,7 @@ export const roleGuard: CanActivateFn = (route: ActivatedRouteSnapshot) => {
 
   // Redirect to their own dashboard if authenticated but wrong role
   if (currentRole) {
-    return router.createUrlTree([`/${currentRole}/dashboard`]);
+    return router.createUrlTree([`/${currentRole}`]);
   }
 
   return router.createUrlTree(['/auth/login']);

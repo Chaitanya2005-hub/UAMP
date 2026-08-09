@@ -1,0 +1,33 @@
+UAMP Blank Question Paper Template
+==================================
+
+Instructions: 
+Copy this text into Microsoft Word and save it as a .docx file. 
+Replace the bracketed text with your actual questions and options. 
+Make sure to keep the numbering (1., 2.) and lettering (A), B)) intact!
+
+---
+
+1. [Type your first question here] [2 marks]
+A) [Type Option A here]
+B) [Type Option B here]
+C) [Type Option C here]
+D) [Type Option D here]
+
+2. [Type your second question here] [1 mark]
+A) [Type Option A here]
+B) [Type Option B here]
+C) [Type Option C here]
+D) [Type Option D here]
+
+3. [Type your third question here] [2 marks]
+A) [Type Option A here]
+B) [Type Option B here]
+C) [Type Option C here]
+D) [Type Option D here]
+
+4. [Type your fourth question here] [1 mark]
+A) [Type Option A here]
+B) [Type Option B here]
+C) [Type Option C here]
+D) [Type Option D here]

@@ -64,7 +64,8 @@
               "buildTarget": "uamp-angular:build:production"
             },
             "development": {
-              "buildTarget": "uamp-angular:build:development"
+              "buildTarget": "uamp-angular:build:development",
+              "proxyConfig": "proxy.conf.json"
             }
           },
           "defaultConfiguration": "development"

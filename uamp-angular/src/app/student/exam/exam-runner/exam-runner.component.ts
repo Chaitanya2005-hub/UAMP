@@ -240,7 +240,7 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.examId = this.route.snapshot.paramMap.get('examId')!;
 
-    this.examService.startExam(this.examId).subscribe({
+    this.examService.beginAttempt(this.examId).subscribe({
       next: async (res) => {
         this.submissionId = res.submissionId;
         await this.encryption.deriveKey(res.sessionSecret);

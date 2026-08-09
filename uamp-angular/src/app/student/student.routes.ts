@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { examTimeWindowGuard } from '../core/guards/exam-time-window.guard';
 
 export const studentRoutes: Routes = [
   { 
@@ -11,7 +12,8 @@ export const studentRoutes: Routes = [
   },
   { 
     path: 'exam/:examId/runner', 
-    loadComponent: () => import('./exam/exam-runner/exam-runner.component').then(m => m.ExamRunnerComponent)
+    loadComponent: () => import('./exam/exam-runner/exam-runner.component').then(m => m.ExamRunnerComponent),
+    canActivate: [examTimeWindowGuard]
   },
   { 
     path: 'exam/:examId/submitted', 

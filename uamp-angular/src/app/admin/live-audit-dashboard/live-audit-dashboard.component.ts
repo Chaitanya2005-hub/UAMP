@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-live-audit-dashboard',
@@ -405,64 +407,25 @@ import { FormsModule } from '@angular/forms';
 })
 export class LiveAuditDashboardComponent implements OnInit {
   selectedExam = '';
-  activeExams = [
-    { id: '1', title: 'Midterm Exam', course: 'CS201', progress: 65 },
-    { id: '2', title: 'Quiz 3', course: 'CS301', progress: 40 },
-    { id: '3', title: 'Final Exam', course: 'CS401', progress: 20 }
-  ];
+  activeExams: any[] = [];
   stats = {
-    activeStudents: 156,
-    warnings: 23,
-    critical: 5,
-    completed: 12
+    activeStudents: 0, warnings: 0, critical: 0, completed: 0
   };
-  recentActivities = [
-    {
-      time: '10:23 AM',
-      type: 'Tab Switch',
-      severity: 'critical',
-      studentName: 'John Doe',
-      description: 'Exceeded tab switch limit (3/3)'
-    },
-    {
-      time: '10:15 AM',
-      type: 'Multiple Faces',
-      severity: 'critical',
-      studentName: 'Jane Smith',
-      description: 'Multiple faces detected in camera frame'
-    },
-    {
-      time: '10:08 AM',
-      type: 'Gaze Deviation',
-      severity: 'warning',
-      studentName: 'Bob Johnson',
-      description: 'Prolonged gaze deviation detected'
-    },
-    {
-      time: '09:55 AM',
-      type: 'Fullscreen Exit',
-      severity: 'warning',
-      studentName: 'Alice Williams',
-      description: 'Student exited fullscreen mode'
-    },
-    {
-      time: '09:45 AM',
-      type: 'Exam Started',
-      severity: 'info',
-      studentName: 'Charlie Brown',
-      description: 'Student began exam session'
-    }
-  ];
+  recentActivities: any[] = [];
+
+  constructor(private http: HttpClient, private router: Router) {}
 
   ngOnInit(): void {
-    // Initialize with mock data
+    this.refreshData();
   }
 
   refreshData(): void {
-    console.log('Refreshing dashboard data');
+    this.http.get<any[]>('/api/exams/active').subscribe(exams => this.activeExams = exams.map(exam => ({ ...exam, progress: 0 })));
+    this.http.get<any>('/api/admin/dashboard/stats').subscribe(stats => this.stats = stats);
+    this.http.get<any[]>('/api/admin/dashboard/activity').subscribe(rows => this.recentActivities = rows.map(row => ({ ...row, time: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })));
   }
 
   viewExamDetails(exam: any): void {
-    console.log('Viewing exam details:', exam.id);
+    this.router.navigate(['/admin/intervention'], { queryParams: { exam: exam.id } });
   }
 }
