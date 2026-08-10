@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProctoringFeedService, StudentProctoringStatus } from '../../services/proctoring-feed.service';
@@ -73,6 +73,7 @@ import { ProctoringFeedService, StudentProctoringStatus } from '../../services/p
             <video
               #videoElement
               class="student-video"
+              [attr.data-submission-id]="student.submissionId"
               [muted]="true"
               [autoplay]="true"
               [playsInline]="true"
@@ -480,6 +481,8 @@ export class LiveProctoringComponent implements OnInit {
   };
   students = signal<StudentProctoringStatus[]>([]);
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
+  private peerConnections = new Map<string, RTCPeerConnection>(); // submissionId -> RTCPeerConnection
+  private webSockets = new Map<string, WebSocket>(); // submissionId -> WebSocket
 
   constructor(private proctoringService: ProctoringFeedService) {}
 
@@ -550,10 +553,82 @@ export class LiveProctoringComponent implements OnInit {
 
   async connectToStudentVideo(submissionId: string): Promise<void> {
     try {
-      const stream = await this.proctoringService.getStudentVideoStream(submissionId);
-      if (this.videoElement) {
-        this.videoElement.nativeElement.srcObject = stream;
-      }
+      // Create WebRTC peer connection for receiving student stream
+      const peerConnection = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+
+      // Store peer connection for cleanup
+      this.peerConnections.set(submissionId, peerConnection);
+
+      // Set up video transceiver to receive stream
+      peerConnection.addTransceiver('video', { direction: 'recvonly' });
+      peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+
+      // Connect to WebSocket signaling server
+      const ws = this.proctoringService.connectToLiveFeed(this.selectedExam);
+      
+      // Store WebSocket for cleanup
+      this.webSockets.set(submissionId, ws);
+      
+      ws.onopen = () => {
+        console.log('[Teacher] WebSocket connected for student:', submissionId);
+        // Request video stream from specific student
+        ws.send(JSON.stringify({
+          type: 'request-stream',
+          submissionId: submissionId,
+          examId: this.selectedExam
+        }));
+      };
+
+      ws.onmessage = async (event) => {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'offer' && message.submissionId === submissionId) {
+          // Handle WebRTC offer from student
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(message.sdp));
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          
+          ws.send(JSON.stringify({
+            type: 'answer',
+            sdp: answer,
+            submissionId: submissionId,
+            examId: this.selectedExam
+          }));
+        } else if (message.type === 'ice-candidate' && message.submissionId === submissionId) {
+          // Handle ICE candidates
+          await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+        }
+      };
+
+      // Handle incoming stream
+      peerConnection.ontrack = (event) => {
+        if (event.streams && event.streams[0]) {
+          // Find the correct video element for this student
+          const videoElement = document.querySelector(`[data-submission-id="${submissionId}"] video`) as HTMLVideoElement;
+          if (videoElement) {
+            videoElement.srcObject = event.streams[0];
+          }
+        }
+      };
+
+      // Send ICE candidates to server
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          ws.send(JSON.stringify({
+            type: 'ice-candidate',
+            candidate: event.candidate,
+            submissionId: submissionId,
+            from: 'teacher',
+            examId: this.selectedExam
+          }));
+        }
+      };
+
     } catch (error) {
       console.error('Failed to connect to student video:', error);
     }
@@ -602,5 +677,20 @@ export class LiveProctoringComponent implements OnInit {
         }
       });
     }
+  }
+
+  ngOnDestroy(): void {
+    // Clean up all peer connections and WebSockets
+    this.peerConnections.forEach((pc, submissionId) => {
+      pc.close();
+      console.log('Closed peer connection for student:', submissionId);
+    });
+    this.peerConnections.clear();
+
+    this.webSockets.forEach((ws, submissionId) => {
+      ws.close();
+      console.log('Closed WebSocket for student:', submissionId);
+    });
+    this.webSockets.clear();
   }
 }

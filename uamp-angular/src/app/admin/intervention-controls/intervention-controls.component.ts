@@ -527,7 +527,7 @@ export class InterventionControlsComponent implements OnInit {
   }
 
   sendMessage(student: any): void {
-    console.log('Sending message to:', student.id);
+    // Message functionality to be implemented
   }
 
   forceSubmit(student: any): void {
@@ -538,47 +538,47 @@ export class InterventionControlsComponent implements OnInit {
 
   pauseExam(): void {
     if (confirm('Are you sure you want to pause this exam?')) {
-      console.log('Pausing exam');
+      // Pause exam functionality to be implemented
     }
   }
 
   resumeExam(): void {
-    console.log('Resuming exam');
+    // Resume exam functionality to be implemented
   }
 
   extendTime(): void {
     const minutes = prompt('Enter number of minutes to extend:');
     if (minutes) {
-      console.log('Extending time by:', minutes);
+      // Extend time functionality to be implemented
     }
   }
 
   terminateExam(): void {
     if (confirm('Are you sure you want to terminate this exam? This action cannot be undone.')) {
-      console.log('Terminating exam');
+      // Terminate exam functionality to be implemented
     }
   }
 
   bulkWarn(): void {
-    console.log('Sending warnings to all critical students');
+    // Bulk warn functionality to be implemented
   }
 
   bulkSubmit(): void {
     if (confirm('Are you sure you want to force submit all critical students?')) {
-      console.log('Force submitting all critical students');
+      // Bulk submit functionality to be implemented
     }
   }
 
   bulkMessage(): void {
     const message = prompt('Enter announcement message:');
     if (message) {
-      console.log('Sending announcement:', message);
+      // Bulk message functionality to be implemented
     }
   }
 
   addAdhocStudent(): void {
     if (this.adhocStudentId && this.adhocReason) {
-      console.log('Adding ad-hoc student:', this.adhocStudentId, 'Reason:', this.adhocReason);
+      // Add ad-hoc student functionality to be implemented
       this.adhocStudentId = '';
       this.adhocReason = '';
     }

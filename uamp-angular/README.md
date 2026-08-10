@@ -21,6 +21,8 @@ UAMP Angular is built with **Angular 22.1.0** and provides a modern, responsive 
 - **Dexie.js 4.4.4** - IndexedDB storage for offline support
 - **Vitest 2.1.0** - Testing framework
 - **RxJS 7.8.0** - Reactive programming
+- **WebRTC API** - Real-time video/audio streaming
+- **WebSocket API** - Real-time signaling for WebRTC connections
 
 ## 🚀 Development Server
 
@@ -160,9 +162,10 @@ The system supports the following courses:
 - Upload DOCX/PDF files
 - Build MCQs manually
 - Generate questions with AI
-- Monitor student proctoring feeds
+- **Monitor student proctoring feeds** with live video streaming
 - View incident timelines
 - Schedule exams
+- **Real-time video monitoring** of students during exams
 
 ### Student
 - View exam dashboard
@@ -170,6 +173,7 @@ The system supports the following courses:
 - Take exams with proctoring
 - View submission status
 - Check performance metrics
+- **Live Video Streaming**: Real-time webcam and microphone streaming during exams
 
 ## 🔌 API Integration
 
@@ -197,14 +201,20 @@ docker run -p 80:80 uamp-angular
 ## 📝 Recent Updates
 
 **August 2026:**
-- ✅ Fixed exam starting issue - students were stuck on "Starting..."
-- ✅ Improved exam lobby logic to better detect admin-started exams
-- ✅ Enhanced admin approvals component with real API integration
-- ✅ Added comprehensive student account support
-- ✅ Improved question paper workflow with immediate saving
-- ✅ Fixed timetable issues for exam scheduling
-- ✅ Updated course list with new subjects
-- ✅ Configured Vitest for proper testing setup
+- ✅ **Live Video Streaming**: Implemented real-time WebRTC video streaming for exam proctoring
+- ✅ **Student Camera Integration**: Enhanced proctor overlay with camera/microphone capture and streaming
+- ✅ **Teacher Video Dashboard**: Updated live proctoring component to receive and display student video feeds
+- ✅ **WebRTC Signaling**: Added WebSocket-based WebRTC signaling infrastructure
+- ✅ **Multiple Stream Support**: Enabled simultaneous video streaming from multiple students
+- ✅ **Resource Management**: Implemented proper cleanup for WebRTC connections and WebSockets
+- ✅ **Fixed exam starting issue** - students were stuck on "Starting..."
+- ✅ **Improved exam lobby logic** to better detect admin-started exams
+- ✅ **Enhanced admin approvals component** with real API integration
+- ✅ **Added comprehensive student account support**
+- ✅ **Improved question paper workflow** with immediate saving
+- ✅ **Fixed timetable issues** for exam scheduling
+- ✅ **Updated course list** with new subjects
+- ✅ **Configured Vitest** for proper testing setup
 
 ## 🤝 Contributing
 

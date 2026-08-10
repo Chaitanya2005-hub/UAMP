@@ -228,18 +228,7 @@ export class ExamLobbyComponent implements OnInit, OnDestroy {
         const startTime = new Date(exam.scheduledStart).getTime();
         const endTime = new Date(exam.scheduledEnd).getTime();
 
-        // Debug logging
-        console.log('Exam Lobby Debug:', {
-          examId,
-          examStatus: exam.status,
-          now: new Date(now).toISOString(),
-          startTime: new Date(startTime).toISOString(),
-          endTime: new Date(endTime).toISOString(),
-          statusCheck: exam.status === 'live',
-          timeCheckStart: now >= startTime,
-          timeCheckEnd: now < endTime,
-          fullCheck: exam.status === 'live' && now >= startTime && now < endTime
-        });
+
 
         // Allow start if exam is live (primary check - server authority)
         // Also allow if exam is 'scheduled' but start time has passed (auto-start)
@@ -251,7 +240,6 @@ export class ExamLobbyComponent implements OnInit, OnDestroy {
         
         // Auto-navigate if exam becomes live and user can start
         if (shouldStart && this.checks.stableConnection && this.checks.cameraReady) {
-          console.log('Auto-starting exam as conditions are met');
           // Optionally auto-start: this.startExam();
         }
       },

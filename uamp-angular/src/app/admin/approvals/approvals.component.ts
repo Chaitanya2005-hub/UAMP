@@ -380,7 +380,7 @@ export class ApprovalsComponent implements OnInit {
   }
 
   previewPaper(paper: any): void {
-    console.log('Previewing paper:', paper.id);
+    // Preview functionality to be implemented
   }
 
   approvePaper(paper: any): void {
@@ -392,7 +392,6 @@ export class ApprovalsComponent implements OnInit {
       next: () => {
         paper.status = 'approved';
         this.loadPapers(); // Refresh the list
-        console.log('Approved paper:', paper.id);
       },
       error: (err) => {
         console.error('Error approving paper:', err);
@@ -414,7 +413,6 @@ export class ApprovalsComponent implements OnInit {
           paper.status = 'rejected';
           paper.rejectionReason = reason;
           this.loadPapers(); // Refresh the list
-          console.log('Rejected paper:', paper.id, 'Reason:', reason);
         },
         error: (err) => {
           console.error('Error rejecting paper:', err);

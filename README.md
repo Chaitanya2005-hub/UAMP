@@ -27,6 +27,8 @@ A comprehensive examination platform with AI-powered proctoring, question paper 
 - Neon PostgreSQL (Database)
 - AWS S3-compatible storage (Neon storage)
 - JWT Authentication
+- WebSocket Server (WebRTC signaling)
+- WebRTC (Real-time video streaming)
 
 **DevOps:**
 - Docker & Docker Compose
@@ -66,7 +68,14 @@ cp .env.example .env
 npm start
 ```
 
-Backend runs on `http://localhost:3000`
+**Backend Dependencies:**
+- Express.js for HTTP server
+- WebSocket (ws) for WebRTC signaling
+- Neon PostgreSQL for database
+- JWT for authentication
+- AWS SDK for file storage
+
+Backend runs on `http://localhost:3000` with WebSocket support on the same port.
 
 #### Frontend Setup
 
@@ -212,6 +221,11 @@ See `02-neon-database-schema.md` for complete schema details.
 
 ### Proctoring
 - `POST /api/proctoring/events` - Log proctoring events
+- `WebSocket ws://localhost:3000/proctoring` - WebRTC signaling for video streaming
+
+**WebSocket Connection:**
+- Student connection: `ws://localhost:3000/proctoring?submissionId={id}&examId={id}`
+- Teacher connection: `ws://localhost:3000/proctoring?examId={id}`
 
 ## 🧪 Testing
 
@@ -281,6 +295,54 @@ docker-compose up -d --build backend
 - Access hall tickets
 - Take exams with proctoring
 - View submission status
+- **Live Video Streaming**: Real-time webcam streaming during exams
+
+## 📹 Live Video Streaming System
+
+The UAMP platform now features a **real-time video streaming system** for exam proctoring using WebRTC technology.
+
+### **How It Works**
+
+1. **Student Portal**: When students start an exam, their camera and microphone are captured
+2. **WebRTC Connection**: Peer-to-peer connection established between student and teacher
+3. **WebSocket Signaling**: Server facilitates WebRTC signaling for connection establishment
+4. **Teacher Dashboard**: Teachers can view live video feeds of all students during exams
+
+### **Technical Implementation**
+
+- **Frontend**: WebRTC API for video/audio capture and streaming
+- **Backend**: WebSocket server for WebRTC signaling and connection management
+- **Protocol**: WebRTC for P2P video streaming, WebSocket for signaling
+- **NAT Traversal**: STUN servers for network connectivity across different networks
+
+### **Features**
+
+- ✅ **Real-time video streaming** from students to teachers
+- ✅ **Multiple concurrent streams** for different students
+- ✅ **Connection status indicators** for both students and teachers
+- ✅ **Automatic resource cleanup** when connections end
+- ✅ **ICE candidate handling** for NAT traversal
+- ✅ **Low latency** peer-to-peer connections
+
+### **Prerequisites**
+
+- Students must grant camera and microphone permissions
+- Teachers must have stable internet connection
+- Network must allow WebSocket connections (port 3000)
+- WebRTC must be supported by browser (modern browsers)
+
+### **Troubleshooting**
+
+**Camera not working:**
+- Check browser permissions for camera/microphone
+- Ensure HTTPS is used in production (required for WebRTC)
+- Verify firewall settings allow WebSocket connections
+
+**Video not showing for teacher:**
+- Ensure student has started the exam
+- Check WebSocket connection status in browser console
+- Verify student's camera is working locally
+- Check network connectivity between student and teacher
 
 ## 🌐 Development
 
@@ -328,22 +390,27 @@ node server/scripts/seed-demo-data.js
 ### 🎯 Recent Updates
 
 **August 2026:**
-- ✅ Added new courses: CS201 (Data Structures and Analysis), CS301 (Theory of Computation), CS401 (Angular Framework), CS402 (Advanced Java Programming)
-- ✅ Created 10 new student accounts with login credentials (STU005-STU014)
-- ✅ Fixed exam starting issue - students were stuck on "Starting..." 
-- ✅ Improved exam lobby logic to better detect admin-started exams
-- ✅ Fixed question paper saving and admin portal reflection issues
-- ✅ Enhanced admin approvals component with real API integration
-- ✅ Added PATCH endpoint for question paper approval/rejection workflow
-- ✅ Fixed timetable issue for exam starting with better server authority prioritization
-- ✅ Added missing `/api/student/submissions` endpoint for student submission history
-- ✅ Fixed environment configuration for proper API URL handling
-- ✅ Updated CORS configuration to support multiple frontend ports
-- ✅ Fixed exam scheduling API parameter handling
-- ✅ Improved backend server startup and error handling
-- ✅ Fixed Angular build issues with environment imports
-- ✅ Removed unnecessary dependencies from frontend package.json
-- ✅ Configured Vitest for testing with proper setup
+- ✅ **Live Video Streaming**: Implemented real-time WebRTC video streaming for exam proctoring
+- ✅ **WebSocket Signaling**: Added WebSocket server for WebRTC connection management
+- ✅ **Student Video Capture**: Enhanced student portal to capture and stream camera/microphone
+- ✅ **Teacher Video Dashboard**: Updated teacher portal to receive and display live student video feeds
+- ✅ **WebRTC Integration**: Full peer-to-peer video streaming with proper signaling infrastructure
+- ✅ **Added new courses**: CS201 (Data Structures and Analysis), CS301 (Theory of Computation), CS401 (Angular Framework), CS402 (Advanced Java Programming)
+- ✅ **Created 10 new student accounts** with login credentials (STU005-STU014)
+- ✅ **Fixed exam starting issue** - students were stuck on "Starting..." 
+- ✅ **Improved exam lobby logic** to better detect admin-started exams
+- ✅ **Fixed question paper saving** and admin portal reflection issues
+- ✅ **Enhanced admin approvals component** with real API integration
+- ✅ **Added PATCH endpoint** for question paper approval/rejection workflow
+- ✅ **Fixed timetable issue** for exam starting with better server authority prioritization
+- ✅ **Added missing `/api/student/submissions` endpoint** for student submission history
+- ✅ **Fixed environment configuration** for proper API URL handling
+- ✅ **Updated CORS configuration** to support multiple frontend ports
+- ✅ **Fixed exam scheduling API parameter handling**
+- ✅ **Improved backend server startup** and error handling
+- ✅ **Fixed Angular build issues** with environment imports
+- ✅ **Removed unnecessary dependencies** from frontend package.json
+- ✅ **Configured Vitest** for testing with proper setup
 
 ## 📝 Documentation
 
@@ -356,6 +423,10 @@ node server/scripts/seed-demo-data.js
 ## 📋 August 2026 Updates Summary
 
 ### New Features
+- **Live Video Streaming System**: Real-time WebRTC video streaming for exam proctoring
+- **WebSocket Signaling Server**: Infrastructure for WebRTC connection management
+- **Student Camera Integration**: Enhanced proctor overlay with camera/microphone streaming
+- **Teacher Video Dashboard**: Live proctoring with real-time student video feeds
 - **4 New Courses Added**: CS201 (Data Structures), CS301 (Theory of Computation), CS401 (Angular), CS402 (Advanced Java)
 - **10 New Student Accounts**: STU005-STU014 with login credentials
 - **Database Management Scripts**: Utility scripts for course and student management
@@ -366,12 +437,15 @@ node server/scripts/seed-demo-data.js
 - **Question Paper Saving**: Fixed immediate saving and admin portal reflection
 - **Timetable Issues**: Resolved exam scheduling time validation problems
 - **TypeScript Errors**: Fixed all compilation and build issues
+- **Video Streaming Issues**: Resolved teacher inability to see student footage
 
 ### Documentation Updates
 - Complete student account credentials list
 - Enhanced README files with project details
 - Database management script documentation
 - Recent changes tracking
+- Video streaming system documentation
+- WebRTC integration details
 
 ## 🤝 Contributing
 

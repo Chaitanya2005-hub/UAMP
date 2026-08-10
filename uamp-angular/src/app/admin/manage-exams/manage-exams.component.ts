@@ -397,7 +397,6 @@ export class ManageExamsComponent implements OnInit {
     this.examManagementService.startExam(examId).subscribe({
       next: (response) => {
         this.startingExam.set(null);
-        console.log('Exam start response:', response);
         // Reload exams after a short delay to ensure server has updated
         setTimeout(() => {
           this.loadExams();

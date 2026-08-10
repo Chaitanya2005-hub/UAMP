@@ -241,11 +241,8 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.examId = this.route.snapshot.paramMap.get('examId')!;
 
-    console.log('Starting exam attempt for examId:', this.examId);
-
     this.examService.beginAttempt(this.examId).subscribe({
       next: async (res) => {
-        console.log('Exam attempt response:', res);
         this.submissionId = res.submissionId;
         await this.encryption.deriveKey(res.sessionSecret);
         this.questions.set(res.questions);
@@ -304,11 +301,8 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
   submitExam(): void {
     if (!confirm('Are you sure you want to submit? You cannot undo this action.')) return;
 
-    console.log('Submitting exam:', this.submissionId);
-
     this.examService.submitExam(this.submissionId).subscribe({
       next: () => {
-        console.log('Exam submitted successfully');
         this.isSubmitted = true;
         this.submissionInProgress = false;
         this.router.navigate(['/student/exam', this.examId, 'submitted']);
@@ -369,7 +363,6 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
   };
 
   private reportTabSwitch(): void {
-    console.log('Tab switch detected for submission:', this.submissionId);
     // Report tab switch to backend
     fetch(`${environment.apiBaseUrl}/proctoring/submission/${this.submissionId}/events`, {
       method: 'POST',

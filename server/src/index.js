@@ -12,6 +12,7 @@ const upload = multer({ storage });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const server = require('http').createServer(app);
 
 // Middleware
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4200').split(',');
@@ -1719,9 +1720,93 @@ app.get('/api/attempts/:attemptId/proctoring-events', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
+// WebSocket Server for WebRTC Signaling
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ noServer: true });
+
+server.on('upgrade', (request, socket, head) => {
+  wss.handleUpgrade(request, socket, head);
+});
+
+// Store peer connections by submission ID
+const peerConnections = new Map(); // submissionId -> WebSocket
+const teacherConnections = new Map(); // examId -> WebSocket
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const submissionId = url.searchParams.get('submissionId');
+  const examId = url.searchParams.get('examId');
+
+  console.log('WebSocket connection:', { submissionId, examId });
+
+  if (submissionId) {
+    // Student connection
+    peerConnections.set(submissionId, ws);
+    console.log('Student connected:', submissionId);
+  } else if (examId) {
+    // Teacher connection
+    teacherConnections.set(examId, ws);
+    console.log('Teacher connected for exam:', examId);
+  }
+
+  ws.on('message', async (message) => {
+    try {
+      const data = JSON.parse(message);
+      
+      if (data.type === 'offer' && data.submissionId) {
+        // Student sending offer - forward to teacher
+        const teacherWs = teacherConnections.get(data.examId);
+        if (teacherWs && teacherWs.readyState === WebSocket.OPEN) {
+          teacherWs.send(JSON.stringify(data));
+        }
+      } else if (data.type === 'answer' && data.submissionId) {
+        // Teacher sending answer - forward to student
+        const studentWs = peerConnections.get(data.submissionId);
+        if (studentWs && studentWs.readyState === WebSocket.OPEN) {
+          studentWs.send(JSON.stringify(data));
+        }
+      } else if (data.type === 'ice-candidate' && data.submissionId) {
+        // ICE candidates - route appropriately
+        const studentWs = peerConnections.get(data.submissionId);
+        const teacherWs = teacherConnections.get(data.examId);
+        
+        if (data.from === 'student' && teacherWs && teacherWs.readyState === WebSocket.OPEN) {
+          teacherWs.send(JSON.stringify({ ...data, from: 'student' }));
+        } else if (data.from === 'teacher' && studentWs && studentWs.readyState === WebSocket.OPEN) {
+          studentWs.send(JSON.stringify({ ...data, from: 'teacher' }));
+        }
+      } else if (data.type === 'request-stream' && data.submissionId) {
+        // Teacher requesting specific student stream
+        const studentWs = peerConnections.get(data.submissionId);
+        if (studentWs && studentWs.readyState === WebSocket.OPEN) {
+          studentWs.send(JSON.stringify({ type: 'stream-request', teacherExamId: data.examId }));
+        }
+      } else if (data.type === 'stream-request') {
+        // Student received stream request - should start streaming
+        console.log('Student received stream request from teacher:', data.teacherExamId);
+      }
+    } catch (error) {
+      console.error('WebSocket message error:', error);
+    }
+  });
+
+  ws.on('close', () => {
+    if (submissionId) {
+      peerConnections.delete(submissionId);
+      console.log('Student disconnected:', submissionId);
+    } else if (examId) {
+      teacherConnections.delete(examId);
+      console.log('Teacher disconnected for exam:', examId);
+    }
+  });
+});
+
+console.log('WebSocket server initialized');
+
+// Start HTTP server with WebSocket support
+server.listen(PORT, () => {
   console.log(`🚀 UAMP Server running on port ${PORT}`);
   console.log(`📊 Database: Neon PostgreSQL`);
   console.log(`🌐 CORS: ${process.env.CORS_ORIGIN || 'http://localhost:4200'}`);
+  console.log(`📡 WebSocket server ready for WebRTC signaling`);
 });
