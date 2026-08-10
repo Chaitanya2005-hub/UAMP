@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
 import { UserRole } from './core/models';
 
@@ -17,7 +17,11 @@ export class App implements OnInit {
   notifications = signal<any[]>([]);
   notificationsOpen = signal(false);
 
-  constructor(protected authService: AuthService, private http: HttpClient) {}
+  constructor(protected authService: AuthService, private http: HttpClient, private router: Router) {}
+
+  showAuthenticatedShell(): boolean {
+    return this.authService.authenticated() && !this.router.url.startsWith('/auth');
+  }
 
   ngOnInit(): void { if (this.authService.authenticated()) this.loadNotifications(); }
 
@@ -39,6 +43,7 @@ export class App implements OnInit {
       case 'teacher':
         return [
           { label: 'Exam Schedule', icon: '▣', link: '/teacher/schedule' },
+          { label: 'Uploaded Papers', icon: '▤', link: '/teacher/question-paper/uploaded' },
           { label: 'Upload Paper', icon: '↑', link: '/teacher/question-paper/upload' },
           { label: 'MCQ Builder', icon: '☷', link: '/teacher/question-paper/mcq-builder' },
           { label: 'AI Generator', icon: '✦', link: '/teacher/question-paper/ai-generator' },

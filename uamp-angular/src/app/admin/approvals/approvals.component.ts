@@ -1,6 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-approvals',
@@ -330,58 +332,45 @@ import { FormsModule } from '@angular/forms';
     }
   `]
 })
-export class ApprovalsComponent {
+export class ApprovalsComponent implements OnInit {
   statusFilter = 'pending';
-  papers = [
-    {
-      id: '1',
-      title: 'Data Structures Midterm Exam',
-      courseCode: 'CS201',
-      teacherName: 'Dr. Smith',
-      sourceMethod: 'manual_builder',
-      status: 'pending_approval',
-      questionCount: 25,
-      totalMarks: 50,
-      createdAt: new Date('2026-08-05'),
-      rejectionReason: null
-    },
-    {
-      id: '2',
-      title: 'Database Systems Quiz 3',
-      courseCode: 'CS301',
-      teacherName: 'Prof. Johnson',
-      sourceMethod: 'ai_generated',
-      status: 'pending_approval',
-      questionCount: 15,
-      totalMarks: 30,
-      createdAt: new Date('2026-08-06'),
-      rejectionReason: null
-    },
-    {
-      id: '3',
-      title: 'Algorithms Final',
-      courseCode: 'CS401',
-      teacherName: 'Dr. Williams',
-      sourceMethod: 'docx_upload',
-      status: 'rejected',
-      questionCount: 30,
-      totalMarks: 60,
-      createdAt: new Date('2026-08-01'),
-      rejectionReason: 'Questions do not align with course learning objectives'
-    },
-    {
-      id: '4',
-      title: 'Web Development Midterm',
-      courseCode: 'CS205',
-      teacherName: 'Dr. Brown',
-      sourceMethod: 'manual_builder',
-      status: 'approved',
-      questionCount: 20,
-      totalMarks: 40,
-      createdAt: new Date('2026-07-28'),
-      rejectionReason: null
-    }
-  ];
+  papers: any[] = [];
+  loading = true;
+  error = '';
+
+  constructor(private http: HttpClient) {}
+
+  ngOnInit(): void {
+    this.loadPapers();
+  }
+
+  loadPapers(): void {
+    this.loading = true;
+    this.error = '';
+
+    this.http.get<any[]>(`${environment.apiBaseUrl}/question-papers`).subscribe({
+      next: (papers) => {
+        this.papers = papers.map(paper => ({
+          id: paper.id,
+          title: paper.title,
+          courseCode: paper.course_title,
+          teacherName: paper.created_by_name,
+          sourceMethod: paper.source_method,
+          status: paper.status,
+          questionCount: 0, // Will be updated with actual count
+          totalMarks: 0, // Will be calculated
+          createdAt: new Date(paper.created_at),
+          rejectionReason: paper.rejection_reason
+        }));
+        this.loading = false;
+      },
+      error: (err) => {
+        this.error = 'Failed to load question papers. Please try again.';
+        this.loading = false;
+        console.error('Error loading papers:', err);
+      }
+    });
+  }
 
   get filteredPapers() {
     if (this.statusFilter === 'all') {
@@ -395,16 +384,43 @@ export class ApprovalsComponent {
   }
 
   approvePaper(paper: any): void {
-    paper.status = 'approved';
-    console.log('Approved paper:', paper.id);
+    this.http.patch(`${environment.apiBaseUrl}/question-papers/${paper.id}`, {
+      status: 'approved',
+      reviewedBy: 'admin',
+      reviewedAt: new Date().toISOString()
+    }).subscribe({
+      next: () => {
+        paper.status = 'approved';
+        this.loadPapers(); // Refresh the list
+        console.log('Approved paper:', paper.id);
+      },
+      error: (err) => {
+        console.error('Error approving paper:', err);
+        alert('Failed to approve paper');
+      }
+    });
   }
 
   rejectPaper(paper: any): void {
     const reason = prompt('Enter rejection reason:');
     if (reason) {
-      paper.status = 'rejected';
-      paper.rejectionReason = reason;
-      console.log('Rejected paper:', paper.id, 'Reason:', reason);
+      this.http.patch(`${environment.apiBaseUrl}/question-papers/${paper.id}`, {
+        status: 'rejected',
+        rejectionReason: reason,
+        reviewedBy: 'admin',
+        reviewedAt: new Date().toISOString()
+      }).subscribe({
+        next: () => {
+          paper.status = 'rejected';
+          paper.rejectionReason = reason;
+          this.loadPapers(); // Refresh the list
+          console.log('Rejected paper:', paper.id, 'Reason:', reason);
+        },
+        error: (err) => {
+          console.error('Error rejecting paper:', err);
+          alert('Failed to reject paper');
+        }
+      });
     }
   }
 }

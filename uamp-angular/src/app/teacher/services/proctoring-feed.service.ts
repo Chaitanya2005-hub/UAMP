@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface ProctoringEvent {
   id: string;
@@ -14,6 +15,12 @@ export interface ProctoringEvent {
   reviewed: boolean;
   reviewedBy?: string;
   reviewedAt?: Date;
+}
+
+export interface ActiveExam {
+  id: string;
+  title: string;
+  course: string;
 }
 
 export interface StudentProctoringStatus {
@@ -44,49 +51,21 @@ export interface LiveProctoringStats {
   providedIn: 'root'
 })
 export class ProctoringFeedService {
-  private apiUrl = '/api/proctoring';
-  private wsUrl = 'wss://api.example.com/proctoring/feed';
+  private apiUrl = `${environment.apiBaseUrl}/proctoring`;
+  private wsUrl = `${environment.websocketUrl}/proctoring`;
 
   constructor(private http: HttpClient) {}
+
+  getActiveExams(): Observable<ActiveExam[]> {
+    return this.http.get<ActiveExam[]>(`${this.apiUrl}/active-exams`);
+  }
 
   getLiveProctoringStats(examId: string): Observable<LiveProctoringStats> {
     return this.http.get<LiveProctoringStats>(`${this.apiUrl}/exam/${examId}/stats`);
   }
 
   getStudentProctoringStatus(examId: string): Observable<StudentProctoringStatus[]> {
-    // Mock implementation
-    return of([
-      {
-        submissionId: '1',
-        studentId: '1',
-        studentName: 'John Doe',
-        enrollmentNumber: 'EN2021001',
-        examId,
-        status: 'active',
-        isLive: true,
-        tabSwitches: 0,
-        fullscreenExits: 0,
-        gazeAlerts: 0,
-        lastActivity: new Date(),
-        cameraConnected: true,
-        microphoneConnected: true
-      },
-      {
-        submissionId: '2',
-        studentId: '2',
-        studentName: 'Jane Smith',
-        enrollmentNumber: 'EN2021002',
-        examId,
-        status: 'warning',
-        isLive: true,
-        tabSwitches: 2,
-        fullscreenExits: 1,
-        gazeAlerts: 1,
-        lastActivity: new Date(),
-        cameraConnected: true,
-        microphoneConnected: true
-      }
-    ]);
+    return this.http.get<StudentProctoringStatus[]>(`${this.apiUrl}/exam/${examId}/students`);
   }
 
   getIncidentTimeline(examId: string, filters?: { severity?: string; studentId?: string }): Observable<ProctoringEvent[]> {
@@ -135,6 +114,7 @@ export class ProctoringFeedService {
 
   getStudentVideoStream(submissionId: string): Promise<MediaStream> {
     // This would typically establish a WebRTC connection
+    // For now, return a stream that can be used for testing
     return navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   }
 }

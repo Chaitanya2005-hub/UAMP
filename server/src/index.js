@@ -4,6 +4,8 @@ const cors = require('cors');
 const { neon } = require('@neondatabase/serverless');
 const s3Service = require('./services/s3.service');
 const mammoth = require('mammoth');
+const QRCode = require('qrcode');
+const PDFDocument = require('pdfkit');
 const multer = require('multer');
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -239,6 +241,25 @@ app.get('/api/courses', async (req, res) => {
 });
 
 // Question Paper Routes
+app.get('/api/question-papers/mine', async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
+  try {
+    const papers = await sql`
+      SELECT qp.id, qp.title, qp.course_id AS "courseId", c.code AS "courseCode", c.title AS "courseTitle",
+        qp.source_method AS "sourceMethod", qp.status, qp.source_file_key AS "sourceFileKey",
+        qp.created_at AS "createdAt", COUNT(q.id)::int AS "questionCount"
+      FROM question_papers qp
+      JOIN courses c ON c.id = qp.course_id
+      LEFT JOIN questions q ON q.question_paper_id = qp.id
+      WHERE qp.created_by = ${user.userId}
+      GROUP BY qp.id, c.code, c.title
+      ORDER BY qp.created_at DESC
+    `;
+    res.json(papers);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 app.get('/api/question-papers', async (req, res) => {
   try {
     const papers = await sql`
@@ -255,12 +276,14 @@ app.get('/api/question-papers', async (req, res) => {
 });
 
 app.post('/api/question-papers', async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
   try {
     const { title, courseId, sourceMethod, sourceFileKey, questions } = req.body;
     
     const newPaper = await sql`
-      INSERT INTO question_papers (title, course_id, source_method, source_file_key, created_by)
-      VALUES (${title}, ${courseId}, ${sourceMethod}, ${sourceFileKey}, ${req.user?.id || '00000000-0000-0000-0000-000000000000'})
+      INSERT INTO question_papers (title, course_id, source_method, source_file_key, created_by, status)
+      VALUES (${title}, ${courseId}, ${sourceMethod}, ${sourceFileKey}, ${user.userId}, 'pending_approval')
       RETURNING *
     `;
     
@@ -275,6 +298,33 @@ app.post('/api/question-papers', async (req, res) => {
     }
     
     res.status(201).json(newPaper[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/question-papers/:id', async (req, res) => {
+  const user = requireRole(req, res, ['admin']);
+  if (!user) return;
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason, reviewedBy, reviewedAt } = req.body;
+    
+    const updated = await sql`
+      UPDATE question_papers 
+      SET status = ${status},
+          rejection_reason = ${rejectionReason || null},
+          reviewed_by = ${reviewedBy || user.userId},
+          reviewed_at = ${reviewedAt || new Date().toISOString()}
+      WHERE id = ${id}
+      RETURNING *
+    `;
+    
+    if (updated.length === 0) {
+      return res.status(404).json({ error: 'Question paper not found' });
+    }
+    
+    res.json(updated[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -487,14 +537,18 @@ function parseQuestionsFromCSV(text) {
 }
 
 app.post('/api/question-papers/upload-parse', upload.single('file'), async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    
+
     let parsedQuestions = [];
     const originalName = req.file.originalname.toLowerCase();
-    
+    const courseId = req.body.courseId;
+    const title = req.body.title || 'Uploaded Question Paper';
+
     if (originalName.endsWith('.csv') || req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/vnd.ms-excel') {
       const text = req.file.buffer.toString('utf-8');
       parsedQuestions = parseQuestionsFromCSV(text);
@@ -515,7 +569,44 @@ app.post('/api/question-papers/upload-parse', upload.single('file'), async (req,
       }];
     }
 
-    res.json({ questions: parsedQuestions });
+    // Save the file to S3
+    const key = s3Service.generateKey('question-papers', req.file.originalname);
+    const { url } = await s3Service.uploadFile(key, req.file.buffer, req.file.mimetype);
+
+    // Create question paper record
+    const questionPaperResult = await sql`
+      INSERT INTO question_papers (course_id, title, source_method, source_file_key, status, created_by)
+      VALUES (${courseId}, ${title}, 'docx_upload', ${key}, 'draft', ${user.userId})
+      RETURNING id
+    `;
+
+    const questionPaperId = questionPaperResult[0].id;
+
+    // Insert parsed questions
+    for (const question of parsedQuestions) {
+      await sql`
+        INSERT INTO questions (question_paper_id, prompt, type, options, correct_answer, order_index, marks)
+        VALUES (
+          ${questionPaperId},
+          ${question.prompt},
+          ${question.type},
+          ${JSON.stringify(question.options)},
+          ${question.correctAnswer},
+          ${question.orderIndex || 1},
+          ${question.marks || 1}
+        )
+      `;
+    }
+
+    res.json({
+      questionPaperId,
+      questions: parsedQuestions,
+      sourceFileKey: key,
+      sourceFileUrl: url,
+      parsedQuestionsCount: parsedQuestions.length,
+      title,
+      status: 'draft'
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -567,9 +658,42 @@ app.get('/api/student/exams', async (req, res) => {
   }
 });
 
+app.get('/api/student/submissions', async (req, res) => {
+  const user = requireRole(req, res, ['student']);
+  if (!user) return;
+  try {
+    const submissions = await sql`
+      SELECT s.id, s.exam_slot_id AS "examSlotId", s.status, s.tab_switch_count AS "tabSwitchCount",
+        s.submitted_at AS "submittedAt", s.created_at AS "createdAt",
+        e.title AS "examTitle", e.scheduled_start AS "scheduledStart"
+      FROM submissions s
+      JOIN exam_slots es ON es.id = s.exam_slot_id
+      JOIN exams e ON e.id = es.exam_id
+      WHERE es.student_id = ${user.userId}
+      ORDER BY s.created_at DESC
+    `;
+    res.json(submissions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/exams/active', async (req, res) => {
   try {
-    const exams = await sql`SELECT e.id, e.title, c.code AS course FROM exams e JOIN question_papers qp ON qp.id = e.question_paper_id JOIN courses c ON c.id = qp.course_id WHERE e.status IN ('live', 'scheduled') ORDER BY e.scheduled_start DESC`;
+    const exams = await sql`
+      SELECT e.id, e.title, e.duration_minutes, e.scheduled_start, e.scheduled_end,
+             e.status, e.proctoring_enabled, e.tab_switch_limit,
+             c.code AS course,
+             COUNT(DISTINCT es.student_id) AS student_count
+      FROM exams e
+      JOIN question_papers qp ON qp.id = e.question_paper_id
+      JOIN courses c ON c.id = qp.course_id
+      LEFT JOIN exam_slots es ON es.exam_id = e.id AND es.registration_status = 'approved'
+      WHERE e.status IN ('live', 'scheduled')
+      GROUP BY e.id, e.title, e.duration_minutes, e.scheduled_start, e.scheduled_end,
+               e.status, e.proctoring_enabled, e.tab_switch_limit, c.code
+      ORDER BY e.scheduled_start DESC
+    `;
     res.json(exams);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
@@ -584,7 +708,26 @@ app.get('/api/exams/:examId', async (req, res) => {
       FROM exams e WHERE e.id = ${req.params.examId}
     `;
     if (!exams.length) return res.status(404).json({ error: 'Exam not found' });
-    res.json(exams[0]);
+
+    const exam = exams[0];
+    const now = new Date();
+    const startTime = new Date(exam.scheduledStart);
+    const endTime = new Date(exam.scheduledEnd);
+
+    // Add debug info
+    exam._debug = {
+      currentTime: now.toISOString(),
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      isLive: exam.status === 'live',
+      withinTimeWindow: now >= startTime && now < endTime,
+      timeComparison: {
+        now_vs_start: now - startTime,
+        now_vs_end: now - endTime
+      }
+    };
+
+    res.json(exam);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -604,7 +747,7 @@ app.post('/api/scheduling/exams', async (req, res) => {
   const user = requireRole(req, res, ['admin', 'teacher']);
   if (!user) return;
   try {
-    const { title, courseId, durationMinutes, scheduledStart, scheduledEnd, questionPaperDeadline, tabSwitchLimit, proctoringEnabled, studentIds, createdBy } = req.body;
+    const { title, courseId, durationMinutes, scheduledStart, scheduledEnd, questionPaperDeadline, tabSwitchLimit, proctoringEnabled, studentIds } = req.body;
     if (!title || !courseId || !scheduledStart || !scheduledEnd || !questionPaperDeadline || !Array.isArray(studentIds) || !studentIds.length) return res.status(400).json({ error: 'Schedule details, a paper deadline, and at least one student are required.' });
     const paper = await sql`INSERT INTO question_papers (course_id, created_by, title, source_method, status) VALUES (${courseId}, ${user.userId}, ${title + ' Question Paper'}, 'manual_builder', 'draft') RETURNING id`;
     const exam = await sql`INSERT INTO exams (question_paper_id, title, duration_minutes, scheduled_start, scheduled_end, tab_switch_limit, proctoring_enabled, status, created_by)
@@ -675,19 +818,18 @@ app.post('/api/exams/:examId/start', async (req, res) => {
   try {
     const { examId } = req.params;
     if (!(await canManageExam(examId, user))) return res.status(403).json({ error: 'You cannot start this exam.' });
+    const exam = await sql`SELECT duration_minutes FROM exams WHERE id = ${examId}`;
+    if (!exam.length) return res.status(404).json({ error: 'Exam not found' });
     const updated = await sql`
       UPDATE exams 
       SET status = 'live', 
           scheduled_start = NOW(),
-          scheduled_end = NOW() + (duration_minutes * INTERVAL '1 minute')
+          scheduled_end = NOW() + (${exam[0].duration_minutes} * INTERVAL '1 minute')
       WHERE id = ${examId} AND status = 'scheduled'
       RETURNING id, status, scheduled_start, scheduled_end
     `;
     if (updated.length === 0) {
-      const exam = await sql`SELECT id FROM exams WHERE id = ${examId}`;
-      return res.status(exam.length ? 409 : 404).json({
-        error: exam.length ? 'Only scheduled exams can be started.' : 'Exam not found'
-      });
+      return res.status(409).json({ error: 'Only scheduled exams can be started.' });
     }
     await notifyExamStudents(examId, 'Exam is now live', 'Your exam has started. Enter the lobby to begin.', 'success');
     res.json({ message: 'Exam started successfully', exam: updated[0] });
@@ -879,14 +1021,145 @@ app.patch('/api/submissions/:id', async (req, res) => {
 app.post('/api/proctoring/events', async (req, res) => {
   try {
     const { submissionId, eventType, severity, metadata, snapshotFileKey } = req.body;
-    
+
     const newEvent = await sql`
       INSERT INTO proctoring_logs (submission_id, event_type, severity, metadata, snapshot_file_key)
       VALUES (${submissionId}, ${eventType}, ${severity}, ${JSON.stringify(metadata)}, ${snapshotFileKey})
       RETURNING *
     `;
-    
+
     res.status(201).json(newEvent[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Hall Ticket Routes
+app.get('/api/hall-tickets/:examId/pdf', async (req, res) => {
+  const user = requireRole(req, res, ['student', 'teacher', 'admin']);
+  if (!user) return;
+  try {
+    const examId = req.params.examId;
+
+    // For students, only allow their own hall tickets
+    // For teachers and admins, allow viewing hall tickets for the exam
+    let examData;
+    if (user.role === 'student') {
+      examData = await sql`
+        SELECT e.id, e.title, e.duration_minutes, e.scheduled_start, e.scheduled_end,
+               e.proctoring_enabled, e.tab_switch_limit,
+               c.code AS course_code, c.title AS course_title,
+               u.full_name, u.enrollment_number, u.email
+        FROM exams e
+        JOIN question_papers qp ON qp.id = e.question_paper_id
+        JOIN courses c ON c.id = qp.course_id
+        JOIN exam_slots es ON es.exam_id = e.id
+        JOIN users u ON u.id = es.student_id
+        WHERE e.id = ${examId} AND es.student_id = ${user.userId} AND es.registration_status = 'approved'
+      `;
+    } else {
+      // For teachers and admins, get the exam details (first student's info as example)
+      examData = await sql`
+        SELECT e.id, e.title, e.duration_minutes, e.scheduled_start, e.scheduled_end,
+               e.proctoring_enabled, e.tab_switch_limit,
+               c.code AS course_code, c.title AS course_title,
+               u.full_name, u.enrollment_number, u.email
+        FROM exams e
+        JOIN question_papers qp ON qp.id = e.question_paper_id
+        JOIN courses c ON c.id = qp.course_id
+        JOIN exam_slots es ON es.exam_id = e.id
+        JOIN users u ON u.id = es.student_id
+        WHERE e.id = ${examId} AND es.registration_status = 'approved'
+        LIMIT 1
+      `;
+    }
+
+    if (!examData.length) {
+      return res.status(404).json({ error: 'Exam slot not found or not approved' });
+    }
+
+    const exam = examData[0];
+
+    // Generate QR code with verification URL
+    const qrData = JSON.stringify({
+      examId: exam.id,
+      enrollmentNumber: exam.enrollment_number,
+      scheduledStart: exam.scheduled_start
+    });
+    const qrCodeDataUrl = await QRCode.toDataURL(qrData);
+
+    // Generate PDF
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const chunks = [];
+
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="hall-ticket-' + examId + '.pdf"');
+      res.send(pdfBuffer);
+    });
+
+    // PDF Content
+    doc.fontSize(24).font('Helvetica-Bold').text('EXAMINATION HALL TICKET', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).font('Helvetica').text('University Assessment and Mastery Portal', { align: 'center' });
+    doc.moveDown(2);
+
+    // Border
+    doc.rect(40, 40, 515, 757).stroke();
+
+    // Student Information
+    doc.fontSize(16).font('Helvetica-Bold').text('Student Information', 50, 120);
+    doc.moveDown();
+    doc.fontSize(12).font('Helvetica').text('Name: ' + exam.full_name, 50, 150);
+    doc.text('Enrollment No: ' + exam.enrollment_number, 50, 170);
+    doc.text('Email: ' + exam.email, 50, 190);
+
+    // Exam Information
+    doc.fontSize(16).font('Helvetica-Bold').text('Exam Information', 300, 120);
+    doc.moveDown();
+    doc.fontSize(12).font('Helvetica').text('Exam Title: ' + exam.title, 300, 150);
+    doc.text('Course: ' + exam.course_code + ' - ' + exam.course_title, 300, 170);
+    doc.text('Duration: ' + exam.duration_minutes + ' minutes', 300, 190);
+
+    // Exam Schedule
+    doc.fontSize(16).font('Helvetica-Bold').text('Exam Schedule', 50, 230);
+    doc.moveDown();
+    doc.fontSize(12).font('Helvetica').text('Start Time: ' + new Date(exam.scheduled_start).toLocaleString(), 50, 260);
+    doc.text('End Time: ' + new Date(exam.scheduled_end).toLocaleString(), 50, 280);
+    doc.text('Proctoring: ' + (exam.proctoring_enabled ? 'Enabled' : 'Disabled'), 50, 300);
+    doc.text('Tab Switch Limit: ' + exam.tab_switch_limit, 50, 320);
+
+    // QR Code
+    doc.fontSize(16).font('Helvetica-Bold').text('Verification QR Code', 300, 230);
+    doc.moveDown();
+    try {
+      const qrImage = doc.openImage(qrCodeDataUrl);
+      doc.image(qrImage, 350, 260, { width: 100, height: 100 });
+    } catch (err) {
+      console.error('Error embedding QR code:', err);
+      doc.fontSize(10).text('QR Code generation failed', 350, 260);
+    }
+
+    // Instructions
+    doc.fontSize(16).font('Helvetica-Bold').text('Instructions', 50, 380);
+    doc.moveDown();
+    doc.fontSize(12).font('Helvetica').text('• Bring this hall ticket and a valid ID proof to the examination center', 50, 410);
+    doc.text('• Report to the examination hall at least 15 minutes before the scheduled time', 50, 430);
+    doc.text('• Electronic devices (phones, smartwatches, etc.) are strictly prohibited', 50, 450);
+    doc.text('• Use of unauthorized materials will result in immediate disqualification', 50, 470);
+    doc.text('• Follow all instructions from the examination invigilators', 50, 490);
+    if (exam.proctoring_enabled) {
+      doc.text('• Camera access and proctoring monitoring will be active during the exam', 50, 510);
+    }
+
+    // Footer
+    doc.fontSize(10).font('Helvetica').text('This is a computer-generated hall ticket. No signature required.', 50, 750);
+    doc.text('Generated on: ' + new Date().toLocaleString(), 50, 770);
+
+    doc.end();
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -927,6 +1200,520 @@ app.get('/api/files/presigned-url/:key', async (req, res) => {
   try {
     const url = await s3Service.getPresignedUrl(req.params.key);
     res.json({ url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Notifications System
+app.get('/api/notifications', async (req, res) => {
+  const user = requireRole(req, res, ['student', 'teacher', 'admin']);
+  if (!user) return;
+  try {
+    const notifications = await sql`
+      SELECT id, notification_type, payload, read, read_at, created_at
+      FROM notifications
+      WHERE recipient_id = ${user.userId}
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+    res.json(notifications);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/notifications/:id/read', async (req, res) => {
+  const user = requireRole(req, res, ['student', 'teacher', 'admin']);
+  if (!user) return;
+  try {
+    await sql`
+      UPDATE notifications
+      SET read = true, read_at = NOW()
+      WHERE id = ${req.params.id} AND recipient_id = ${user.userId}
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/notifications/mark-all-read', async (req, res) => {
+  const user = requireRole(req, res, ['student', 'teacher', 'admin']);
+  if (!user) return;
+  try {
+    await sql`
+      UPDATE notifications
+      SET read = true, read_at = NOW()
+      WHERE recipient_id = ${user.userId} AND read = false
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create notification helper function
+async function createNotification(recipientId, type, payload) {
+  try {
+    await sql`
+      INSERT INTO notifications (recipient_id, notification_type, payload)
+      VALUES (${recipientId}, ${type}, ${JSON.stringify(payload)})
+    `;
+  } catch (error) {
+    console.error('Failed to create notification:', error);
+  }
+}
+
+// Advanced Exam Configuration
+app.get('/api/exams/:examId/config', async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
+  try {
+    const examConfig = await sql`
+      SELECT config
+      FROM exams
+      WHERE id = ${req.params.examId}
+    `;
+    if (examConfig.length === 0) {
+      return res.status(404).json({ error: 'Exam not found' });
+    }
+    res.json(examConfig[0].config || {});
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/exams/:examId/config', async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
+  try {
+    const config = req.body;
+    await sql`
+      UPDATE exams
+      SET config = ${JSON.stringify(config)}
+      WHERE id = ${req.params.examId}
+    `;
+    res.json({ success: true, config });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bloom's Taxonomy Endpoints
+app.get('/api/student/bloom-mastery', async (req, res) => {
+  const user = requireRole(req, res, ['student']);
+  if (!user) return;
+  try {
+    const masteryData = await sql`
+      SELECT bloom_level, avg_score, question_count
+      FROM student_bloom_mastery
+      WHERE student_id = ${user.userId}
+      ORDER BY bloom_level
+    `;
+    res.json(masteryData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/questions/:questionId/bloom-level', async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
+  try {
+    const question = await sql`
+      SELECT bloom_level
+      FROM questions
+      WHERE id = ${req.params.questionId}
+    `;
+    if (question.length === 0) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+    res.json({ bloom_level: question[0].bloom_level });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/questions/:questionId/bloom-level', async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
+  try {
+    const { bloom_level } = req.body;
+    await sql`
+      UPDATE questions
+      SET bloom_level = ${bloom_level}
+      WHERE id = ${req.params.questionId}
+    `;
+    res.json({ success: true, bloom_level });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Proctoring API endpoints
+app.get('/api/proctoring/active-exams', async (req, res) => {
+  const user = requireRole(req, res, ['admin', 'teacher']);
+  if (!user) return;
+  try {
+    const exams = await sql`
+      SELECT e.id, e.title, c.code as course
+      FROM exams e
+      JOIN courses c ON c.id = (
+        SELECT course_id FROM question_papers WHERE id = e.question_paper_id
+      )
+      WHERE e.status = 'live' AND e.scheduled_end > NOW()
+      ORDER BY e.scheduled_start
+    `;
+    res.json(exams);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/proctoring/exam/:examId/stats', async (req, res) => {
+  const user = requireRole(req, res, ['admin', 'teacher']);
+  if (!user) return;
+  try {
+    const stats = await sql`
+      SELECT
+        COUNT(*) as total_students,
+        COUNT(CASE WHEN s.status = 'in_progress' THEN 1 END) as active_students,
+        COUNT(CASE WHEN s.status = 'in_progress' AND p.severity = 'warning' THEN 1 END) as warning_count,
+        COUNT(CASE WHEN s.status = 'in_progress' AND p.severity = 'critical' THEN 1 END) as critical_count,
+        COUNT(CASE WHEN s.status = 'submitted' THEN 1 END) as completed_count
+      FROM exam_slots es
+      LEFT JOIN submissions s ON s.exam_slot_id = es.id
+      LEFT JOIN proctoring_logs p ON p.submission_id = s.id
+      WHERE es.exam_id = ${req.params.examId} AND es.registration_status = 'approved'
+    `;
+    res.json(stats[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/proctoring/exam/:examId/students', async (req, res) => {
+  const user = requireRole(req, res, ['admin', 'teacher']);
+  if (!user) return;
+  try {
+    const students = await sql`
+      SELECT
+        s.id as submission_id,
+        u.id as student_id,
+        u.full_name as student_name,
+        u.enrollment_number,
+        es.exam_id,
+        s.status,
+        s.tab_switch_count,
+        s.started_at,
+        s.started_at > NOW() - INTERVAL '5 minutes' as is_live,
+        COALESCE(p.camera_connected, false) as camera_connected,
+        COALESCE(p.microphone_connected, false) as microphone_connected,
+        COUNT(CASE WHEN p.severity = 'warning' THEN 1 END) as gaze_alerts,
+        COUNT(CASE WHEN p.event_type = 'fullscreen_exit' THEN 1 END) as fullscreen_exits
+      FROM exam_slots es
+      JOIN users u ON u.id = es.student_id
+      LEFT JOIN submissions s ON s.exam_slot_id = es.id
+      LEFT JOIN proctoring_logs p ON p.submission_id = s.id
+      WHERE es.exam_id = ${req.params.examId} AND es.registration_status = 'approved'
+      GROUP BY s.id, u.id, u.full_name, u.enrollment_number, es.exam_id, s.status, s.tab_switch_count, s.started_at
+    `;
+
+    const formattedStudents = students.map(student => ({
+      submissionId: student.submission_id,
+      studentId: student.student_id,
+      studentName: student.student_name,
+      enrollmentNumber: student.enrollment_number,
+      examId: student.exam_id,
+      status: student.status === 'in_progress' ? 'active' : student.status,
+      isLive: student.is_live,
+      tabSwitches: student.tab_switch_count || 0,
+      fullscreenExits: student.fullscreen_exits || 0,
+      gazeAlerts: student.gaze_alerts || 0,
+      lastActivity: student.started_at || new Date(),
+      cameraConnected: student.camera_connected,
+      microphoneConnected: student.microphone_connected
+    }));
+
+    res.json(formattedStudents);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/proctoring/submission/:submissionId/events', async (req, res) => {
+  const user = requireRole(req, res, ['student']);
+  if (!user) return;
+  try {
+    const { incident_type, severity, metadata } = req.body;
+    await sql`
+      INSERT INTO proctoring_logs (submission_id, event_type, severity, metadata, timestamp)
+      VALUES (${req.params.submissionId}, ${incident_type}, ${severity}, ${JSON.stringify(metadata)}, NOW())
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/proctoring/submission/:submissionId/warn', async (req, res) => {
+  const user = requireRole(req, res, ['admin', 'teacher']);
+  if (!user) return;
+  try {
+    const { message } = req.body;
+    // In a real implementation, this would send a WebSocket message to the student
+    // For now, just log it
+    console.log(`Warning sent to submission ${req.params.submissionId}: ${message}`);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/proctoring/submission/:submissionId/force-submit', async (req, res) => {
+  const user = requireRole(req, res, ['admin', 'teacher']);
+  if (!user) return;
+  try {
+    const { reason } = req.body;
+    await sql`
+      UPDATE submissions
+      SET status = 'force_submitted', submitted_at = NOW()
+      WHERE id = ${req.params.submissionId} AND status = 'in_progress'
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Permission Overrides
+app.get('/api/users', async (req, res) => {
+  const user = requireRole(req, res, ['admin']);
+  if (!user) return;
+  try {
+    const users = await sql`
+      SELECT id, full_name, email, role, created_at
+      FROM users
+      ORDER BY created_at DESC
+    `;
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/users/:userId/permissions', async (req, res) => {
+  const user = requireRole(req, res, ['admin']);
+  if (!user) return;
+  try {
+    const permissions = await sql`
+      SELECT permission_code, granted_by, created_at
+      FROM user_permission_overrides
+      WHERE user_id = ${req.params.userId}
+    `;
+    res.json(permissions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/users/:userId/permissions', async (req, res) => {
+  const user = requireRole(req, res, ['admin']);
+  if (!user) return;
+  try {
+    const { permission_code } = req.body;
+    await sql`
+      INSERT INTO user_permission_overrides (user_id, permission_code, granted_by)
+      VALUES (${req.params.userId}, ${permission_code}, ${user.userId})
+      ON CONFLICT (user_id, permission_code) DO NOTHING
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/users/:userId/permissions/:permissionCode', async (req, res) => {
+  const user = requireRole(req, res, ['admin']);
+  if (!user) return;
+  try {
+    await sql`
+      DELETE FROM user_permission_overrides
+      WHERE user_id = ${req.params.userId} AND permission_code = ${req.params.permissionCode}
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Additional Question Types Support
+app.get('/api/question-types', async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
+  try {
+    const questionTypes = [
+      { type: 'mcq_single', label: 'Single Choice MCQ', autoGradeable: true },
+      { type: 'mcq_multi', label: 'Multiple Choice MCQ', autoGradeable: true },
+      { type: 'true_false', label: 'True/False', autoGradeable: true },
+      { type: 'short_answer', label: 'Short Answer', autoGradeable: false },
+      { type: 'numeric', label: 'Numeric Answer', autoGradeable: true },
+      { type: 'essay', label: 'Essay Question', autoGradeable: false },
+      { type: 'matching', label: 'Matching Items', autoGradeable: true },
+      { type: 'ordering', label: 'Ordering/Sequence', autoGradeable: true },
+      { type: 'fill_blank', label: 'Fill in the Blanks', autoGradeable: true },
+      { type: 'code', label: 'Code Answer', autoGradeable: false }
+    ];
+    res.json(questionTypes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Structured Approval Workflow
+app.post('/api/question-papers/:id/submit-for-approval', async (req, res) => {
+  const user = requireRole(req, res, ['teacher']);
+  if (!user) return;
+  try {
+    await sql`
+      UPDATE question_papers
+      SET status = 'pending_approval', submitted_at = NOW()
+      WHERE id = ${req.params.id} AND created_by = ${user.userId}
+    `;
+
+    // Notify admins
+    const admins = await sql`
+      SELECT id FROM users WHERE role = 'admin'
+    `;
+
+    for (const admin of admins) {
+      await createNotification(admin.id, 'approval_needed', {
+        message: 'New question paper requires approval',
+        questionPaperId: req.params.id
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/question-papers/:id/approve', async (req, res) => {
+  const user = requireRole(req, res, ['admin']);
+  if (!user) return;
+  try {
+    const { feedback } = req.body;
+
+    const paper = await sql`
+      SELECT created_by FROM question_papers WHERE id = ${req.params.id}
+    `;
+
+    if (paper.length === 0) {
+      return res.status(404).json({ error: 'Question paper not found' });
+    }
+
+    await sql`
+      UPDATE question_papers
+      SET status = 'approved', reviewed_by = ${user.userId}, reviewed_at = NOW(), feedback = ${feedback || null}
+      WHERE id = ${req.params.id}
+    `;
+
+    // Notify the faculty member
+    await createNotification(paper[0].created_by, 'approval_granted', {
+      message: 'Your question paper has been approved',
+      questionPaperId: req.params.id
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/question-papers/:id/reject', async (req, res) => {
+  const user = requireRole(req, res, ['admin']);
+  if (!user) return;
+  try {
+    const { rejection_reason } = req.body;
+
+    if (!rejection_reason) {
+      return res.status(400).json({ error: 'Rejection reason is required' });
+    }
+
+    const paper = await sql`
+      SELECT created_by FROM question_papers WHERE id = ${req.params.id}
+    `;
+
+    if (paper.length === 0) {
+      return res.status(404).json({ error: 'Question paper not found' });
+    }
+
+    await sql`
+      UPDATE question_papers
+      SET status = 'rejected', reviewed_by = ${user.userId}, reviewed_at = NOW(), rejection_reason = ${rejection_reason}
+      WHERE id = ${req.params.id}
+    `;
+
+    // Notify the faculty member
+    await createNotification(paper[0].created_by, 'approval_rejected', {
+      message: 'Your question paper was rejected',
+      questionPaperId: req.params.id,
+      reason: rejection_reason
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/question-papers/pending-approval', async (req, res) => {
+  const user = requireRole(req, res, ['admin']);
+  if (!user) return;
+  try {
+    const papers = await sql`
+      SELECT qp.*, u.full_name as author_name, c.code as course_code
+      FROM question_papers qp
+      JOIN users u ON u.id = qp.created_by
+      JOIN courses c ON c.id = qp.course_id
+      WHERE qp.status = 'pending_approval'
+      ORDER BY qp.submitted_at DESC
+    `;
+    res.json(papers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Advanced Proctoring Endpoints
+app.post('/api/proctoring/incident', async (req, res) => {
+  const user = requireRole(req, res, ['student']);
+  if (!user) return;
+  try {
+    const { attempt_id, incident_type, severity, metadata, snapshot_url } = req.body;
+    await sql`
+      INSERT INTO integrity_events (attempt_id, event_type, severity, metadata, snapshot_url)
+      VALUES (${attempt_id}, ${incident_type}, ${severity}, ${JSON.stringify(metadata)}, ${snapshot_url})
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/attempts/:attemptId/proctoring-events', async (req, res) => {
+  const user = requireRole(req, res, ['teacher', 'admin']);
+  if (!user) return;
+  try {
+    const events = await sql`
+      SELECT id, event_type, severity, metadata, snapshot_url, created_at
+      FROM integrity_events
+      WHERE attempt_id = ${req.params.attemptId}
+      ORDER BY created_at DESC
+    `;
+    res.json(events);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

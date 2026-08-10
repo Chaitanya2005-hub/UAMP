@@ -9,6 +9,7 @@ import { Question } from '../../../core/models';
 import { QuestionPanelComponent } from '../question-panel/question-panel.component';
 import { ProctorOverlayComponent } from '../proctor-overlay/proctor-overlay.component';
 import { CountdownPipe } from '../../../shared/pipes/countdown.pipe';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-exam-runner',
@@ -240,8 +241,11 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.examId = this.route.snapshot.paramMap.get('examId')!;
 
+    console.log('Starting exam attempt for examId:', this.examId);
+
     this.examService.beginAttempt(this.examId).subscribe({
       next: async (res) => {
+        console.log('Exam attempt response:', res);
         this.submissionId = res.submissionId;
         await this.encryption.deriveKey(res.sessionSecret);
         this.questions.set(res.questions);
@@ -264,7 +268,13 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
         this.startAutosave();
         this.startSync();
         this.startTimer();
+        this.startTabSwitchDetection();
       },
+      error: (error) => {
+        console.error('Failed to start exam attempt:', error);
+        alert('Failed to start exam. Please try again.');
+        this.router.navigate(['/student/dashboard']);
+      }
     });
   }
 
@@ -294,12 +304,19 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
   submitExam(): void {
     if (!confirm('Are you sure you want to submit? You cannot undo this action.')) return;
 
+    console.log('Submitting exam:', this.submissionId);
+
     this.examService.submitExam(this.submissionId).subscribe({
       next: () => {
+        console.log('Exam submitted successfully');
         this.isSubmitted = true;
         this.submissionInProgress = false;
         this.router.navigate(['/student/exam', this.examId, 'submitted']);
       },
+      error: (error) => {
+        console.error('Failed to submit exam:', error);
+        alert('Failed to submit exam. Please try again.');
+      }
     });
   }
 
@@ -336,9 +353,47 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
     });
   }
 
+  private startTabSwitchDetection(): void {
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    window.addEventListener('blur', this.handleBlur);
+  }
+
+  private handleVisibilityChange = (): void => {
+    if (document.hidden) {
+      this.reportTabSwitch();
+    }
+  };
+
+  private handleBlur = (): void => {
+    this.reportTabSwitch();
+  };
+
+  private reportTabSwitch(): void {
+    console.log('Tab switch detected for submission:', this.submissionId);
+    // Report tab switch to backend
+    fetch(`${environment.apiBaseUrl}/proctoring/submission/${this.submissionId}/events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        incident_type: 'tab_switch',
+        severity: 'warning',
+        metadata: {
+          timestamp: new Date().toISOString(),
+          type: 'tab_switch'
+        }
+      })
+    }).catch(error => {
+      console.error('Failed to report tab switch:', error);
+    });
+  }
+
   ngOnDestroy(): void {
     this.autosaveSub?.unsubscribe();
     this.syncSub?.unsubscribe();
     this.timerSub?.unsubscribe();
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    window.removeEventListener('blur', this.handleBlur);
   }
 }

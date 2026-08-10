@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ProctoringFeedService, StudentProctoringStatus } from '../../services/proctoring-feed.service';
 
 @Component({
   selector: 'app-live-proctoring',
@@ -11,7 +12,7 @@ import { FormsModule } from '@angular/forms';
       <div class="proctoring-header">
         <h2>Live Proctoring Dashboard</h2>
         <div class="header-controls">
-          <select class="exam-select" [(ngModel)]="selectedExam">
+          <select class="exam-select" [(ngModel)]="selectedExam" (change)="onExamChange()">
             <option value="">Select Exam</option>
             <option *ngFor="let exam of activeExams" [value]="exam.id">
               {{ exam.title }} - {{ exam.course }}
@@ -52,14 +53,14 @@ import { FormsModule } from '@angular/forms';
       </div>
 
       <div class="student-grid" *ngIf="selectedExam">
-        <div class="student-card" 
-             *ngFor="let student of students" 
+        <div class="student-card"
+             *ngFor="let student of students()"
              [class.status-warning]="student.status === 'warning'"
              [class.status-critical]="student.status === 'critical'"
              [class.status-offline]="student.status === 'offline'">
           <div class="student-header">
             <div class="student-info">
-              <span class="student-name">{{ student.name }}</span>
+              <span class="student-name">{{ student.studentName }}</span>
               <span class="student-id">{{ student.enrollmentNumber }}</span>
             </div>
             <div class="status-indicator" [class.status-live]="student.isLive">
@@ -69,12 +70,20 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <div class="student-feed">
-            <div class="video-placeholder">
+            <video
+              #videoElement
+              class="student-video"
+              [muted]="true"
+              [autoplay]="true"
+              [playsInline]="true"
+              *ngIf="student.cameraConnected"
+            ></video>
+            <div class="video-placeholder" *ngIf="!student.cameraConnected">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M23 7l-7 5 7 5V7z"/>
-                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                  <path d="M23 7l-7 5 7 5V7z"/>
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
               </svg>
-              <span>Camera Feed</span>
+              <span>Camera Offline</span>
             </div>
           </div>
 
@@ -262,7 +271,7 @@ import { FormsModule } from '@angular/forms';
     }
 
     .student-card.status-offline {
-      opacity: 0.5;
+      opacity: 0.6;
     }
 
     .student-header {
@@ -275,34 +284,39 @@ import { FormsModule } from '@angular/forms';
     .student-info {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: 0.125rem;
     }
 
     .student-name {
       color: #e6ebf5;
-      font-weight: 600;
+      font-weight: 500;
+      font-size: 0.9375rem;
     }
 
     .student-id {
       color: #94a3b8;
-      font-size: 0.875rem;
+      font-size: 0.75rem;
     }
 
     .status-indicator {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.375rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 9999px;
+      font-size: 0.75rem;
       color: #94a3b8;
-      font-size: 0.875rem;
     }
 
     .status-indicator.status-live {
       color: #22d3ee;
+      background: rgba(34, 211, 238, 0.1);
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background: #94a3b8;
     }
@@ -318,24 +332,34 @@ import { FormsModule } from '@angular/forms';
     }
 
     .student-feed {
+      position: relative;
+      aspect-ratio: 16/9;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      overflow: hidden;
       margin-bottom: 1rem;
     }
 
+    .student-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
     .video-placeholder {
-      aspect-ratio: 4/3;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
+      height: 100%;
       color: #94a3b8;
+      gap: 0.5rem;
     }
 
     .video-placeholder svg {
       width: 32px;
       height: 32px;
+      opacity: 0.5;
     }
 
     .student-metrics {
@@ -343,8 +367,6 @@ import { FormsModule } from '@angular/forms';
       grid-template-columns: repeat(3, 1fr);
       gap: 0.75rem;
       margin-bottom: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .metric {
@@ -420,110 +442,165 @@ import { FormsModule } from '@angular/forms';
     }
 
     .empty-state {
-      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 1rem;
+      flex: 1;
       color: #94a3b8;
+      gap: 1rem;
     }
 
     .empty-state svg {
-      width: 64px;
-      height: 64px;
+      width: 48px;
+      height: 48px;
       opacity: 0.5;
     }
 
     .empty-state h3 {
-      color: #e6ebf5;
       margin: 0;
+      color: #e6ebf5;
     }
 
     .empty-state p {
       margin: 0;
-      text-align: center;
-    }
-
-    svg {
-      width: 18px;
-      height: 18px;
+      font-size: 0.875rem;
     }
   `]
 })
 export class LiveProctoringComponent implements OnInit {
   selectedExam = '';
-  activeExams = [
-    { id: '1', title: 'Midterm Exam', course: 'CS201' },
-    { id: '2', title: 'Quiz 3', course: 'CS301' }
-  ];
+  activeExams: Array<{ id: string; title: string; course: string }> = [];
   stats = {
-    total: 45,
-    active: 38,
-    warnings: 5,
-    critical: 2,
+    total: 0,
+    active: 0,
+    warnings: 0,
+    critical: 0,
     completed: 0
   };
-  students = [
-    {
-      id: '1',
-      name: 'John Doe',
-      enrollmentNumber: 'EN2021001',
-      status: 'active',
-      isLive: true,
-      tabSwitches: 0,
-      fullscreenExits: 0,
-      gazeAlerts: 0
-    },
-    {
-      id: '2',
-      name: 'Jane Smith',
-      enrollmentNumber: 'EN2021002',
-      status: 'warning',
-      isLive: true,
-      tabSwitches: 2,
-      fullscreenExits: 1,
-      gazeAlerts: 1
-    },
-    {
-      id: '3',
-      name: 'Bob Johnson',
-      enrollmentNumber: 'EN2021003',
-      status: 'critical',
-      isLive: true,
-      tabSwitches: 3,
-      fullscreenExits: 2,
-      gazeAlerts: 3
-    },
-    {
-      id: '4',
-      name: 'Alice Williams',
-      enrollmentNumber: 'EN2021004',
-      status: 'offline',
-      isLive: false,
-      tabSwitches: 1,
-      fullscreenExits: 0,
-      gazeAlerts: 0
-    }
-  ];
+  students = signal<StudentProctoringStatus[]>([]);
+  @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
+
+  constructor(private proctoringService: ProctoringFeedService) {}
 
   ngOnInit(): void {
-    // Initialize with mock data
+    this.loadActiveExams();
+  }
+
+  loadActiveExams(): void {
+    // Load active exams from API
+    this.proctoringService.getActiveExams().subscribe({
+      next: (exams) => {
+        console.log('Loaded active exams:', exams);
+        this.activeExams = exams;
+      },
+      error: (error) => {
+        console.error('Failed to load active exams:', error);
+        // Show empty state
+        this.activeExams = [];
+        alert('Failed to load active exams. Please refresh.');
+      }
+    });
+  }
+
+  onExamChange(): void {
+    if (this.selectedExam) {
+      this.loadStudentStatus();
+      this.loadStats();
+    }
+  }
+
+  loadStudentStatus(): void {
+    this.proctoringService.getStudentProctoringStatus(this.selectedExam).subscribe({
+      next: (students) => {
+        console.log('Loaded student proctoring status:', students);
+        this.students.set(students);
+        // Attempt to connect to video streams for connected students
+        students.forEach(student => {
+          if (student.cameraConnected) {
+            this.connectToStudentVideo(student.submissionId);
+          }
+        });
+      },
+      error: (error) => {
+        console.error('Failed to load student status:', error);
+        // Show empty state instead of mock data
+        this.students.set([]);
+        alert('Failed to load student data. Please refresh or check if students have started the exam.');
+      }
+    });
+  }
+
+  loadStats(): void {
+    this.proctoringService.getLiveProctoringStats(this.selectedExam).subscribe({
+      next: (stats) => {
+        this.stats = {
+          total: stats.totalStudents,
+          active: stats.activeStudents,
+          warnings: stats.warningCount,
+          critical: stats.criticalCount,
+          completed: stats.completedCount
+        };
+      },
+      error: (error) => {
+        console.error('Failed to load stats:', error);
+      }
+    });
+  }
+
+  async connectToStudentVideo(submissionId: string): Promise<void> {
+    try {
+      const stream = await this.proctoringService.getStudentVideoStream(submissionId);
+      if (this.videoElement) {
+        this.videoElement.nativeElement.srcObject = stream;
+      }
+    } catch (error) {
+      console.error('Failed to connect to student video:', error);
+    }
   }
 
   refreshFeeds(): void {
-    console.log('Refreshing proctoring feeds');
+    this.loadStudentStatus();
+    this.loadStats();
   }
 
-  viewStudent(student: any): void {
-    console.log('Focusing on student:', student.id);
+  viewStudent(student: StudentProctoringStatus): void {
+    console.log('Viewing student:', student);
+    // Focus on specific student - could expand card or show detailed view
+    alert(`Focusing on ${student.studentName} (${student.enrollmentNumber})`);
   }
 
-  sendMessage(student: any): void {
-    console.log('Sending message to student:', student.id);
+  sendMessage(student: StudentProctoringStatus): void {
+    console.log('Sending message to student:', student);
+    const message = prompt('Enter warning message for student:');
+    if (message) {
+      this.proctoringService.sendWarningToStudent(student.submissionId, message).subscribe({
+        next: () => {
+          console.log('Warning sent successfully');
+          alert('Warning sent to student');
+        },
+        error: (error) => {
+          console.error('Failed to send warning:', error);
+          alert('Failed to send warning');
+        }
+      });
+    }
   }
 
-  intervene(student: any): void {
-    console.log('Intervening for student:', student.id);
+  intervene(student: StudentProctoringStatus): void {
+    console.log('Intervening with student:', student);
+    if (confirm(`Are you sure you want to force submit ${student.studentName}'s exam?`)) {
+      this.proctoringService.forceSubmitStudent(student.submissionId, 'Teacher intervention').subscribe({
+        next: () => {
+          console.log('Student exam force submitted');
+          alert('Student exam has been force submitted');
+          this.refreshFeeds();
+        },
+        error: (error) => {
+          console.error('Failed to force submit:', error);
+          alert('Failed to force submit exam');
+        }
+      });
+    }
   }
 }

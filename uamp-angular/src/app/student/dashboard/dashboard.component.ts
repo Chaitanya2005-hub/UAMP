@@ -103,6 +103,19 @@ import { BloomMasteryPoint, ExamSlot } from '../../core/models';
               </div>
             </ng-template>
           </app-glass-panel>
+
+        <!-- Mastery Analytics Link -->
+        <div class="glass-panel">
+          <div class="mastery-link">
+            <div class="mastery-icon">📊</div>
+            <div class="mastery-content">
+              <h3>Bloom's Taxonomy Mastery</h3>
+              <p>View your cognitive strengths and areas for improvement</p>
+            </div>
+            <a routerLink="/student/mastery" class="btn btn-primary">
+              View Analytics
+            </a>
+          </div>
         </div>
       </div>
     </div>
@@ -230,6 +243,33 @@ import { BloomMasteryPoint, ExamSlot } from '../../core/models';
       text-align: center;
       padding: 40px 0;
       color: var(--uamp-text-muted);
+    }
+
+    .mastery-link {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .mastery-icon {
+      font-size: 2rem;
+    }
+
+    .mastery-content {
+      flex: 1;
+    }
+
+    .mastery-content h3 {
+      margin: 0 0 4px 0;
+      color: var(--uamp-text-primary);
+      font-size: 1rem;
+    }
+
+    .mastery-content p {
+      margin: 0;
+      color: var(--uamp-text-muted);
+      font-size: 0.8125rem;
     }
 
     @media (max-width: 1024px) {

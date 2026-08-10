@@ -1,7 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
+import { ExamManagementService, Exam } from '../../teacher/services/exam-management.service';
 
 @Component({
   selector: 'app-manage-exams',
@@ -12,7 +12,7 @@ import { RouterLink } from '@angular/router';
       <div class="glass-panel">
         <div class="header-section">
           <div>
-            <h2>Manage Exams</h2>
+            <h2>📅 Manage Exams</h2>
             <p class="subtitle">View scheduled, live, and completed exams</p>
           </div>
           <button routerLink="/admin/schedule" class="btn-primary">
@@ -20,74 +20,115 @@ import { RouterLink } from '@angular/router';
           </button>
         </div>
 
-        <div class="exams-list" *ngIf="exams.length > 0; else emptyState">
-          <div class="exam-card" *ngFor="let exam of exams">
-            <div class="exam-header">
-              <div class="exam-title-group">
+        <div class="glass-panel exams-container" *ngIf="!loading()">
+          <div class="exams-list" *ngIf="exams().length > 0; else emptyState">
+            <div class="exam-card" *ngFor="let exam of exams()">
+              <div class="exam-header">
                 <h3>{{ exam.title }}</h3>
-                <span class="exam-meta">
-                  Question Paper: {{ exam.question_paper_title }}
+                <span class="badge" 
+                      [class.scheduled]="exam.status === 'scheduled'"
+                      [class.live]="exam.status === 'live'"
+                      [class.completed]="exam.status === 'completed'"
+                      [class.cancelled]="exam.status === 'cancelled'">
+                  {{ exam.status | uppercase }}
                 </span>
               </div>
-              <span class="status-badge" 
-                    [class.status-scheduled]="exam.status === 'scheduled'"
-                    [class.status-live]="exam.status === 'live'"
-                    [class.status-completed]="exam.status === 'completed'"
-                    [class.status-cancelled]="exam.status === 'cancelled'">
-                {{ exam.status | uppercase }}
-              </span>
-            </div>
 
-            <div class="exam-details">
-              <div class="detail-item">
-                <span class="label">Duration:</span>
-                <span class="value">{{ exam.duration_minutes }} mins</span>
+              <div class="exam-details">
+                <div class="detail-item">
+                  <span class="label">Course:</span>
+                  <span class="value">{{ exam.course }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Duration:</span>
+                  <span class="value">{{ exam.duration_minutes }} minutes</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Scheduled Start:</span>
+                  <span class="value">{{ exam.scheduled_start | date:'medium' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Scheduled End:</span>
+                  <span class="value">{{ exam.scheduled_end | date:'medium' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Proctoring:</span>
+                  <span class="value">{{ exam.proctoring_enabled ? 'Enabled' : 'Disabled' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Registered Students:</span>
+                  <span class="value">{{ exam.student_count || 0 }}</span>
+                </div>
               </div>
-              <div class="detail-item">
-                <span class="label">Scheduled Start:</span>
-                <span class="value">{{ exam.scheduled_start | date:'medium' }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="label">Scheduled End:</span>
-                <span class="value">{{ exam.scheduled_end | date:'medium' }}</span>
-              </div>
-            </div>
 
-            <div class="exam-actions">
-              <button *ngIf="exam.status === 'scheduled'" 
-                      (click)="startExam(exam)" 
-                      class="btn-action btn-start">
-                Start Exam Now
-              </button>
-              <button *ngIf="exam.status === 'scheduled'" (click)="cancelExam(exam)" class="btn-action btn-end">Cancel</button>
-              <button (click)="viewAttendance(exam)" class="btn-action">Attendance</button>
-              <button *ngIf="exam.status === 'live'" 
-                      (click)="endExam(exam)" 
-                      class="btn-action btn-end">
-                Force End Exam
-              </button>
-              <span class="action-meta" *ngIf="exam.status === 'completed'">
-                Exam Completed
-              </span>
-              <span class="action-meta" *ngIf="exam.status === 'cancelled'">
-                Exam Cancelled
-              </span>
+              <div class="exam-actions" *ngIf="exam.status === 'scheduled'">
+                <button
+                  class="btn btn-primary start-btn"
+                  (click)="startExam(exam.id)"
+                  [disabled]="startingExam() === exam.id"
+                >
+                  {{ startingExam() === exam.id ? 'Starting...' : '▶ Start Exam Now' }}
+                </button>
+                <button
+                  class="btn btn-secondary"
+                  (click)="cancelExam(exam.id)"
+                >
+                  ❌ Cancel Exam
+                </button>
+                <button
+                  class="btn btn-secondary"
+                  (click)="viewAttendance(exam.id)"
+                >
+                  👥 Attendance
+                </button>
+              </div>
+
+              <div class="exam-actions" *ngIf="exam.status === 'live'">
+                <button
+                  class="btn btn-success"
+                  (click)="goToMonitoring(exam.id)"
+                >
+                  📹 Monitor Live Exam
+                </button>
+                <button
+                  class="btn btn-danger"
+                  (click)="endExam(exam.id)"
+                  [disabled]="endingExam() === exam.id"
+                >
+                  {{ endingExam() === exam.id ? 'Ending...' : '⏹ Force End Exam' }}
+                </button>
+              </div>
+
+              <div class="exam-actions" *ngIf="exam.status === 'completed'">
+                <span class="action-meta">✅ Exam Completed</span>
+                <button
+                  class="btn btn-secondary"
+                  (click)="viewAttendance(exam.id)"
+                >
+                  👥 View Attendance
+                </button>
+              </div>
+
+              <div class="exam-actions" *ngIf="exam.status === 'cancelled'">
+                <span class="action-meta">❌ Exam Cancelled</span>
+              </div>
             </div>
           </div>
+
+          <ng-template #emptyState>
+            <div class="empty-state">
+              <p>No scheduled exams found.</p>
+            </div>
+          </ng-template>
         </div>
 
-        <ng-template #emptyState>
-          <div class="empty-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            <h3>No Scheduled Exams</h3>
-            <p>Schedule a new exam timetable using the button above.</p>
-          </div>
-        </ng-template>
+        <div *ngIf="loading()">
+          <p class="loading">Loading exams...</p>
+        </div>
+
+        <div *ngIf="error()">
+          <p class="error">{{ error() }}</p>
+        </div>
       </div>
     </div>
   `,
@@ -105,6 +146,13 @@ import { RouterLink } from '@angular/router';
       backdrop-filter: blur(18px) saturate(140%);
       padding: 2rem;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+    }
+
+    .exams-container {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
     }
 
     .header-section {
@@ -162,108 +210,111 @@ import { RouterLink } from '@angular/router';
     .exam-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       margin-bottom: 1.25rem;
     }
 
-    .exam-title-group h3 {
-      margin: 0 0 0.25rem 0;
+    .exam-header h3 {
+      margin: 0;
       color: #e6ebf5;
       font-size: 1.25rem;
     }
 
-    .exam-meta {
-      color: #94a3b8;
-      font-size: 0.875rem;
-    }
-
-    .status-badge {
+    .badge {
       padding: 0.375rem 0.875rem;
       border-radius: 12px;
       font-size: 0.75rem;
       font-weight: 700;
+      text-transform: uppercase;
     }
 
-    .status-badge.status-scheduled {
+    .badge.scheduled {
       background: rgba(251, 191, 36, 0.15);
       color: #fbbf24;
     }
 
-    .status-badge.status-live {
+    .badge.live {
       background: rgba(52, 211, 153, 0.15);
       color: #34d399;
     }
 
-    .status-badge.status-completed {
+    .badge.completed {
       background: rgba(148, 163, 184, 0.15);
       color: #94a3b8;
     }
 
-    .status-badge.status-cancelled {
+    .badge.cancelled {
       background: rgba(248, 113, 113, 0.15);
       color: #f87171;
     }
 
     .exam-details {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-      margin-bottom: 1.25rem;
-      padding-bottom: 1.25rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
     .detail-item {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
     }
 
     .detail-item .label {
+      font-size: 0.75rem;
       color: #94a3b8;
-      font-size: 0.875rem;
+      margin-bottom: 4px;
     }
 
     .detail-item .value {
+      font-size: 0.875rem;
       color: #e6ebf5;
       font-weight: 500;
     }
 
     .exam-actions {
       display: flex;
-      justify-content: flex-end;
-      align-items: center;
+      gap: 10px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .btn-action {
-      padding: 0.6rem 1.25rem;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
+    .start-btn {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
       border: none;
-      transition: all 0.15s ease;
     }
 
-    .btn-start {
-      background: rgba(52, 211, 153, 0.2);
-      color: #34d399;
-      border: 1px solid rgba(52, 211, 153, 0.3);
+    .start-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
     }
 
-    .btn-start:hover {
-      background: rgba(52, 211, 153, 0.35);
-      transform: translateY(-1px);
+    .btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      border: none;
     }
 
-    .btn-end {
-      background: rgba(248, 113, 113, 0.2);
-      color: #f87171;
-      border: 1px solid rgba(248, 113, 113, 0.3);
+    .btn-secondary {
+      background: #6b7280;
+      color: white;
     }
 
-    .btn-end:hover {
-      background: rgba(248, 113, 113, 0.35);
-      transform: translateY(-1px);
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .action-meta {
@@ -273,91 +324,131 @@ import { RouterLink } from '@angular/router';
     }
 
     .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 4rem 2rem;
-      gap: 1rem;
-      color: #94a3b8;
-    }
-
-    .empty-state svg {
-      width: 64px;
-      height: 64px;
-      opacity: 0.4;
-    }
-
-    .empty-state h3 {
-      color: #e6ebf5;
-      margin: 0;
-    }
-
-    .empty-state p {
-      margin: 0;
       text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+    }
+
+    .loading, .error {
+      text-align: center;
+      padding: 40px 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+    }
+
+    .error {
+      color: #ef4444;
+    }
+
+    @media (max-width: 768px) {
+      .exam-details {
+        grid-template-columns: 1fr;
+      }
+
+      .exam-actions {
+        flex-direction: column;
+      }
+
+      .exam-actions button {
+        width: 100%;
+      }
     }
   `]
 })
 export class ManageExamsComponent implements OnInit {
-  exams: any[] = [];
+  exams = signal<Exam[]>([]);
+  loading = signal(true);
+  error = signal('');
+  startingExam = signal<string | null>(null);
+  endingExam = signal<string | null>(null);
 
-  constructor(private http: HttpClient) {}
+  constructor(private examManagementService: ExamManagementService) {}
 
   ngOnInit(): void {
     this.loadExams();
   }
 
   loadExams(): void {
-    this.http.get<any[]>('/api/exams').subscribe({
-      next: (data) => this.exams = data,
-      error: (err) => console.error('Failed to load exams', err)
-    });
-  }
+    this.loading.set(true);
+    this.error.set('');
 
-  startExam(exam: any): void {
-    if (confirm(`Are you sure you want to start the exam "${exam.title}" immediately? This will make it active for all assigned students right now.`)) {
-      this.http.post(`/api/exams/${exam.id}/start`, {}).subscribe({
-        next: () => {
-          this.loadExams();
-        },
-        error: (err) => {
-          console.error('Failed to start exam', err);
-          alert('Error starting exam');
-        }
-      });
-    }
-  }
-
-  endExam(exam: any): void {
-    if (confirm(`Are you sure you want to end the live exam "${exam.title}"? This will terminate the slot for all students.`)) {
-      this.http.post(`/api/exams/${exam.id}/end`, {}).subscribe({
-        next: () => {
-          this.loadExams();
-        },
-        error: (err) => {
-          console.error('Failed to end exam', err);
-          alert('Error ending exam');
-        }
-      });
-    }
-  }
-
-  cancelExam(exam: any): void {
-    if (!confirm(`Cancel "${exam.title}"? Assigned students will no longer be able to start it.`)) return;
-    this.http.post(`/api/exams/${exam.id}/cancel`, {}).subscribe({
-      next: () => this.loadExams(),
-      error: (err) => alert(err.error?.error || 'Could not cancel exam')
-    });
-  }
-
-  viewAttendance(exam: any): void {
-    this.http.get<any[]>(`/api/exams/${exam.id}/attendance`).subscribe({
-      next: rows => {
-        const summary = rows.map(row => `${row.name}: ${row.submissionStatus || 'absent'}`).join('\n') || 'No assigned students.';
-        alert(`Attendance — ${exam.title}\n\n${summary}`);
+    this.examManagementService.getActiveExams().subscribe({
+      next: (exams) => {
+        this.exams.set(exams);
+        this.loading.set(false);
       },
-      error: (err) => alert(err.error?.error || 'Could not load attendance')
+      error: (err) => {
+        this.error.set('Failed to load exams. Please try again.');
+        this.loading.set(false);
+        console.error('Error loading exams:', err);
+      }
     });
+  }
+
+  startExam(examId: string): void {
+    if (!confirm('Are you sure you want to start this exam now? This will begin the exam immediately for all registered students.')) {
+      return;
+    }
+
+    this.startingExam.set(examId);
+
+    this.examManagementService.startExam(examId).subscribe({
+      next: (response) => {
+        this.startingExam.set(null);
+        console.log('Exam start response:', response);
+        // Reload exams after a short delay to ensure server has updated
+        setTimeout(() => {
+          this.loadExams();
+        }, 1000);
+        alert('Exam started successfully! Students can now enter the exam lobby.');
+      },
+      error: (err) => {
+        this.startingExam.set(null);
+        alert('Failed to start exam: ' + (err.error?.error || err.message));
+        console.error('Error starting exam:', err);
+      }
+    });
+  }
+
+  endExam(examId: string): void {
+    if (!confirm('Are you sure you want to end this exam? This will immediately stop the exam for all students.')) {
+      return;
+    }
+
+    this.endingExam.set(examId);
+
+    this.examManagementService.endExam(examId).subscribe({
+      next: () => {
+        this.endingExam.set(null);
+        this.loadExams();
+        alert('Exam ended successfully!');
+      },
+      error: (err) => {
+        this.endingExam.set(null);
+        alert('Failed to end exam: ' + (err.error?.error || err.message));
+        console.error('Error ending exam:', err);
+      }
+    });
+  }
+
+  cancelExam(examId: string): void {
+    if (!confirm('Are you sure you want to cancel this exam? Assigned students will no longer be able to start it.')) {
+      return;
+    }
+
+    // Implement cancel exam API call
+    alert('Cancel exam functionality - ID: ' + examId);
+  }
+
+  viewAttendance(examId: string): void {
+    // Implement attendance viewing
+    alert('View attendance functionality - ID: ' + examId);
+  }
+
+  goToMonitoring(examId: string): void {
+    // Navigate to live proctoring
+    window.location.href = `/admin/live-audit?examId=${examId}`;
   }
 }

@@ -119,6 +119,7 @@ export interface ProctoringLog {
 export interface BloomMasteryPoint {
   axis: 'Remember' | 'Understand' | 'Apply' | 'Analyze' | 'Evaluate' | 'Create';
   masteryPct: number;
+  questionCount?: number;
 }
 
 export interface Course {

@@ -38,7 +38,7 @@ A comprehensive examination platform with AI-powered proctoring, question paper 
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/Chaitanya2005-hub/UAMP.git
 cd UAMP
 
 # Start all services
@@ -115,7 +115,12 @@ UAMP/
 │   │   └── services/
 │   │       └── s3.service.js   # S3 file storage
 │   ├── scripts/
-│   │   └── setup-test-data.js # Database seeding
+│   │   ├── setup-test-data.js  # Database seeding
+│   │   ├── seed-demo-data.js   # Demo data seeding
+│   │   ├── add-new-courses.js  # Add new courses to database
+│   │   ├── verify-courses.js   # Verify courses in database
+│   │   ├── create-students.js  # Create student accounts
+│   │   └── verify-students.js  # Verify student accounts
 │   ├── Dockerfile
 │   └── package.json
 ├── uamp-angular/                # Angular Frontend
@@ -147,9 +152,21 @@ After running the setup script (`node server/scripts/setup-test-data.js`):
 - Email: `teacher@uamp.edu`
 - Password: `teacher123`
 
-**Student:**
-- Email: `student@uamp.edu`
-- Password: `student123`
+**Students:**
+- STU001 - Student User: `student@uamp.edu` / `student123`
+- STU002 - Priya Sharma: `priya.sharma@uamp.edu` / `priya123`
+- STU003 - Arjun Reddy: `arjun.reddy@uamp.edu` / `arjun123`
+- STU004 - Fatima Khan: `fatima.khan@uamp.edu` / `fatima123`
+- STU005 - Rahul Kumar: `rahul.kumar@uamp.edu` / `rahul123`
+- STU006 - Priya Singh: `priya.singh@uamp.edu` / `priya123`
+- STU007 - Amit Patel: `amit.patel@uamp.edu` / `amit123`
+- STU008 - Sneha Gupta: `sneha.gupta@uamp.edu` / `sneha123`
+- STU009 - Vikram Sharma: `vikram.sharma@uamp.edu` / `vikram123`
+- STU010 - Nisha Verma: `nisha.verma@uamp.edu` / `nisha123`
+- STU011 - Rohit Mehta: `rohit.mehta@uamp.edu` / `rohit123`
+- STU012 - Kavita Rani: `kavita.rani@uamp.edu` / `kavita123`
+- STU013 - Deepak Joshi: `deepak.joshi@uamp.edu` / `deepak123`
+- STU014 - Pooja Kumari: `pooja.kumari@uamp.edu` / `pooja123`
 
 ## 📊 Database Schema
 
@@ -173,6 +190,13 @@ See `02-neon-database-schema.md` for complete schema details.
 
 ### Courses
 - `GET /api/courses` - Get all courses
+
+**Available Courses:**
+- CS101 - Introduction to Computer Science
+- CS201 - Data Structures and Analysis
+- CS301 - Theory of Computation
+- CS401 - Angular Framework
+- CS402 - Advanced Java Programming
 
 ### Question Papers
 - `GET /api/question-papers` - Get all question papers
@@ -280,6 +304,47 @@ npm start
 2. Run the schema from `02-neon-database-schema.md`
 3. Run the setup script: `node server/scripts/setup-test-data.js`
 
+### Database Management Scripts
+
+The project includes several utility scripts for database management:
+
+```bash
+# Add new courses to the database
+node server/scripts/add-new-courses.js
+
+# Verify courses in the database
+node server/scripts/verify-courses.js
+
+# Create student accounts
+node server/scripts/create-students.js
+
+# Verify student accounts and credentials
+node server/scripts/verify-students.js
+
+# Seed demo data for testing
+node server/scripts/seed-demo-data.js
+```
+
+### 🎯 Recent Updates
+
+**August 2026:**
+- ✅ Added new courses: CS201 (Data Structures and Analysis), CS301 (Theory of Computation), CS401 (Angular Framework), CS402 (Advanced Java Programming)
+- ✅ Created 10 new student accounts with login credentials (STU005-STU014)
+- ✅ Fixed exam starting issue - students were stuck on "Starting..." 
+- ✅ Improved exam lobby logic to better detect admin-started exams
+- ✅ Fixed question paper saving and admin portal reflection issues
+- ✅ Enhanced admin approvals component with real API integration
+- ✅ Added PATCH endpoint for question paper approval/rejection workflow
+- ✅ Fixed timetable issue for exam starting with better server authority prioritization
+- ✅ Added missing `/api/student/submissions` endpoint for student submission history
+- ✅ Fixed environment configuration for proper API URL handling
+- ✅ Updated CORS configuration to support multiple frontend ports
+- ✅ Fixed exam scheduling API parameter handling
+- ✅ Improved backend server startup and error handling
+- ✅ Fixed Angular build issues with environment imports
+- ✅ Removed unnecessary dependencies from frontend package.json
+- ✅ Configured Vitest for testing with proper setup
+
 ## 📝 Documentation
 
 - `01-system-architecture.md` - System architecture overview
@@ -287,6 +352,26 @@ npm start
 - `03-angular-component-blueprint.md` - Angular component specifications
 - `04-proctoring-security-engine.md` - Proctoring system details
 - `05-ui-ux-animation-guide.md` - UI/UX guidelines
+
+## 📋 August 2026 Updates Summary
+
+### New Features
+- **4 New Courses Added**: CS201 (Data Structures), CS301 (Theory of Computation), CS401 (Angular), CS402 (Advanced Java)
+- **10 New Student Accounts**: STU005-STU014 with login credentials
+- **Database Management Scripts**: Utility scripts for course and student management
+- **Enhanced Question Paper Workflow**: Real-time approval/rejection system
+
+### Bug Fixes
+- **Exam Starting Issue**: Fixed students stuck on "Starting..." with improved lobby logic
+- **Question Paper Saving**: Fixed immediate saving and admin portal reflection
+- **Timetable Issues**: Resolved exam scheduling time validation problems
+- **TypeScript Errors**: Fixed all compilation and build issues
+
+### Documentation Updates
+- Complete student account credentials list
+- Enhanced README files with project details
+- Database management script documentation
+- Recent changes tracking
 
 ## 🤝 Contributing
 

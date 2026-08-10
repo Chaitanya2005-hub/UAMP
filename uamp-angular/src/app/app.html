@@ -1,4 +1,4 @@
-@if (authService.authenticated()) {
+@if (showAuthenticatedShell()) {
   <div class="app-shell">
     <header class="topbar">
       <button class="menu-toggle" type="button" (click)="sidebarOpen.set(!sidebarOpen())" aria-label="Toggle navigation">☰</button>
