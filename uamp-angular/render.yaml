@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: uamp-frontend
+    env: static
+    plan: free
+    buildCommand: npm run build
+    publishDirectory: dist/uamp-angular
+    envVars:
+      - key: API_BASE_URL
+        value: https://uamp-backend.onrender.com/api
+      - key: WEBSOCKET_URL
+        value: wss://uamp-backend.onrender.com/ws

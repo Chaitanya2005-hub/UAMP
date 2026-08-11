@@ -1,6 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { TeacherSidebarComponent } from '../teacher-sidebar/teacher-sidebar.component';
 import { NotificationsComponent } from '../../shared/components/notifications/notifications.component';
 import { ExamManagementService } from '../services/exam-management.service';
@@ -328,7 +329,7 @@ export class TeacherDashboardComponent implements OnInit {
   totalStudents = signal(0);
   upcomingExamsList = signal<any[]>([]);
 
-  constructor(private examManagementService: ExamManagementService) {}
+  constructor(private examManagementService: ExamManagementService, private http: HttpClient) {}
 
   ngOnInit(): void {
     this.loadDashboardData();
@@ -341,7 +342,17 @@ export class TeacherDashboardComponent implements OnInit {
         this.liveExams.set(exams.filter(e => e.status === 'live').length);
         this.totalStudents.set(exams.reduce((sum, exam) => sum + (exam.student_count || 0), 0));
         this.upcomingExamsList.set(exams.filter(e => e.status === 'scheduled').slice(0, 5));
-        this.questionPapers.set(exams.length); // Using exam count as proxy for papers
+        
+        // Load question papers count
+        this.http.get<any[]>('/api/question-papers/mine').subscribe({
+          next: (papers) => {
+            this.questionPapers.set(papers.length);
+          },
+          error: (err) => {
+            console.error('Error loading question papers:', err);
+            this.questionPapers.set(0);
+          }
+        });
       },
       error: (err) => {
         console.error('Error loading dashboard data:', err);

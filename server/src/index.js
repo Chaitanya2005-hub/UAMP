@@ -67,11 +67,17 @@ async function closeExpiredExams() {
 }
 
 async function notifyExamStudents(examId, title, message, type = 'info') {
-  await sql`
-    INSERT INTO notifications (user_id, title, message, type)
-    SELECT student_id, ${title}, ${message}, ${type}
-    FROM exam_slots WHERE exam_id = ${examId} AND registration_status = 'approved'
-  `;
+  try {
+    const result = await sql`
+      INSERT INTO notifications (user_id, title, message, type)
+      SELECT student_id, ${title}, ${message}, ${type}
+      FROM exam_slots WHERE exam_id = ${examId} AND registration_status = 'approved'
+    `;
+    console.log(`Notified ${result.count} students for exam ${examId}`);
+  } catch (error) {
+    console.warn(`Failed to notify students for exam ${examId}:`, error.message);
+    // Don't fail the exam start if notification fails
+  }
 }
 
 // Test database connection
@@ -142,7 +148,7 @@ app.post('/api/auth/login', async (req, res) => {
     `;
     
     if (users.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'User not found. Please check your email address.' });
     }
     
     const user = users[0];
@@ -151,7 +157,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     // For now, simple comparison (NOT SECURE - use bcrypt in production)
     if (password !== user.password_hash) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Wrong password entered. Please enter the right password.' });
     }
     
     // Generate JWT token
@@ -315,7 +321,7 @@ app.patch('/api/question-papers/:id', async (req, res) => {
       UPDATE question_papers 
       SET status = ${status},
           rejection_reason = ${rejectionReason || null},
-          reviewed_by = ${reviewedBy || user.userId},
+          reviewed_by = ${user.id},
           reviewed_at = ${reviewedAt || new Date().toISOString()}
       WHERE id = ${id}
       RETURNING *
@@ -680,6 +686,8 @@ app.get('/api/student/submissions', async (req, res) => {
 });
 
 app.get('/api/exams/active', async (req, res) => {
+  const user = requireRole(req, res, ['admin', 'teacher']);
+  if (!user) return;
   try {
     const exams = await sql`
       SELECT e.id, e.title, e.duration_minutes, e.scheduled_start, e.scheduled_end,
@@ -760,7 +768,18 @@ app.post('/api/scheduling/exams', async (req, res) => {
       FROM jsonb_array_elements_text(${JSON.stringify(studentIds)}::jsonb) AS student_id
       ON CONFLICT (exam_id, student_id) DO NOTHING
     `;
+    
+    // Notify students about the new exam
     await notifyExamStudents(exam[0].id, 'New exam scheduled', `${title} has been added to your timetable.`, 'schedule');
+    
+    // Create announcement for all users about the new exam
+    await sql`
+      INSERT INTO notifications (user_id, title, message, type)
+      SELECT id, 'New Exam Scheduled', ${`A new exam "${title}" has been scheduled for ${new Date(scheduledStart).toLocaleDateString()}.`}, 'exam_scheduled'
+      FROM users
+      WHERE role IN ('admin', 'teacher')
+    `;
+    
     res.status(201).json({ id: exam[0].id });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
@@ -1725,7 +1744,9 @@ const WebSocket = require('ws');
 const wss = new WebSocket.Server({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
-  wss.handleUpgrade(request, socket, head);
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    wss.emit('connection', ws, request);
+  });
 });
 
 // Store peer connections by submission ID

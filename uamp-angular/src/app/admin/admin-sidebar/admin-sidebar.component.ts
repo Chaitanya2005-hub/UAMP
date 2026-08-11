@@ -60,6 +60,15 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
         </a>
 
         <a
+          routerLink="/admin/live-proctoring"
+          routerLinkActive="active"
+          class="nav-item"
+        >
+          <span class="nav-icon">🎥</span>
+          <span class="nav-text">Live Proctoring</span>
+        </a>
+
+        <a
           routerLink="/admin/intervention"
           routerLinkActive="active"
           class="nav-item"

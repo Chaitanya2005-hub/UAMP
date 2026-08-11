@@ -26,6 +26,10 @@ export const adminRoutes: Routes = [
     loadComponent: () => import('./live-audit-dashboard/live-audit-dashboard.component').then(m => m.LiveAuditDashboardComponent)
   },
   {
+    path: 'live-proctoring',
+    loadComponent: () => import('../teacher/monitoring/live-proctoring/live-proctoring.component').then(m => m.LiveProctoringComponent)
+  },
+  {
     path: 'intervention',
     loadComponent: () => import('./intervention-controls/intervention-controls.component').then(m => m.InterventionControlsComponent)
   },

@@ -32,7 +32,19 @@ import { environment } from '../../../../environments/environment';
           <span class="sync-indicator" [class.synced]="lastSynced()">
             {{ lastSynced() ? '☁️ Synced' : '💾 Local' }}
           </span>
-          <button class="btn btn-danger btn-sm" (click)="submitExam()">Submit</button>
+          <button 
+            class="btn btn-danger btn-sm" 
+            (click)="submitExam()"
+            [disabled]="!isExamReady || isSubmitted"
+            *ngIf="!isSubmitted">
+            Submit
+          </button>
+          <span class="submit-status" *ngIf="isSubmitted">
+            ✅ Submitted
+          </span>
+          <span class="loading-status" *ngIf="!isExamReady">
+            ⏳ Loading...
+          </span>
         </div>
       </div>
 
@@ -132,6 +144,18 @@ import { environment } from '../../../../environments/environment';
       color: var(--uamp-accent-success);
     }
 
+    .submit-status {
+      font-size: 0.8125rem;
+      color: var(--uamp-accent-success);
+      font-weight: 600;
+    }
+
+    .loading-status {
+      font-size: 0.8125rem;
+      color: var(--uamp-accent-warning);
+      font-weight: 600;
+    }
+
     .btn-sm { padding: 6px 16px; font-size: 0.8125rem; }
 
     .exam-body {
@@ -222,8 +246,9 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
   answers = signal<Record<string, unknown>>({});
   endTime = signal<Date>(new Date());
   lastSynced = signal(false);
-  submissionInProgress = true;
+  submissionInProgress = false;
   isSubmitted = false;
+  isExamReady = false;
   timeRemaining = signal(0);
 
   private autosaveSub?: Subscription;
@@ -266,6 +291,9 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
         this.startSync();
         this.startTimer();
         this.startTabSwitchDetection();
+        
+        // Mark exam as ready
+        this.isExamReady = true;
       },
       error: (error) => {
         console.error('Failed to start exam attempt:', error);

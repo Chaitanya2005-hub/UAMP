@@ -41,6 +41,16 @@ export const errorInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, n
 };
 
 function normalizeError(error: HttpErrorResponse): ApiError {
+  // Preserve the backend error format for auth errors
+  if (error.status === 401 && error.error?.error) {
+    return {
+      status: error.status,
+      code: error.error?.code ?? 'AUTH_ERROR',
+      message: error.error?.error ?? error.message ?? 'Authentication failed',
+      details: error.error?.details,
+    };
+  }
+  
   return {
     status: error.status,
     code: error.error?.code ?? 'UNKNOWN_ERROR',

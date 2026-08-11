@@ -45,6 +45,16 @@
   padding: 0;
 }
 
+button:focus {
+  outline: 2px solid var(--uamp-accent-primary);
+  outline-offset: 2px;
+}
+
+a:focus {
+  outline: 2px solid var(--uamp-accent-primary);
+  outline-offset: 2px;
+}
+
 html {
   font-size: 16px;
   scroll-behavior: smooth;
@@ -253,12 +263,12 @@ a {
   &:focus {
     outline: none;
     border-color: var(--uamp-accent-primary);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
   }
 
   &.ng-invalid.ng-touched {
     border-color: var(--uamp-accent-critical);
-    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15);
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.3);
   }
 }
 

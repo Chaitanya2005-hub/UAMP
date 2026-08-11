@@ -376,6 +376,9 @@ export class ApprovalsComponent implements OnInit {
     if (this.statusFilter === 'all') {
       return this.papers;
     }
+    if (this.statusFilter === 'pending') {
+      return this.papers.filter(p => p.status === 'pending_approval' || p.status === 'draft');
+    }
     return this.papers.filter(p => p.status === this.statusFilter);
   }
 
@@ -384,23 +387,33 @@ export class ApprovalsComponent implements OnInit {
   }
 
   approvePaper(paper: any): void {
+    if (!confirm(`Are you sure you want to approve "${paper.title}"?`)) {
+      return;
+    }
+
     this.http.patch(`${environment.apiBaseUrl}/question-papers/${paper.id}`, {
       status: 'approved',
       reviewedBy: 'admin',
       reviewedAt: new Date().toISOString()
     }).subscribe({
-      next: () => {
+      next: (response) => {
+        console.log('Paper approved successfully:', response);
         paper.status = 'approved';
         this.loadPapers(); // Refresh the list
+        alert('Question paper approved successfully!');
       },
       error: (err) => {
         console.error('Error approving paper:', err);
-        alert('Failed to approve paper');
+        alert(`Failed to approve paper: ${err.error?.error || err.message || 'Unknown error'}`);
       }
     });
   }
 
   rejectPaper(paper: any): void {
+    if (!confirm(`Are you sure you want to reject "${paper.title}"?`)) {
+      return;
+    }
+
     const reason = prompt('Enter rejection reason:');
     if (reason) {
       this.http.patch(`${environment.apiBaseUrl}/question-papers/${paper.id}`, {
@@ -409,14 +422,16 @@ export class ApprovalsComponent implements OnInit {
         reviewedBy: 'admin',
         reviewedAt: new Date().toISOString()
       }).subscribe({
-        next: () => {
+        next: (response) => {
+          console.log('Paper rejected successfully:', response);
           paper.status = 'rejected';
           paper.rejectionReason = reason;
           this.loadPapers(); // Refresh the list
+          alert('Question paper rejected successfully!');
         },
         error: (err) => {
           console.error('Error rejecting paper:', err);
-          alert('Failed to reject paper');
+          alert(`Failed to reject paper: ${err.error?.error || err.message || 'Unknown error'}`);
         }
       });
     }

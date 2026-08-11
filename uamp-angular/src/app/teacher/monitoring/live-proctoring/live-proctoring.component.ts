@@ -517,7 +517,16 @@ export class LiveProctoringComponent implements OnInit {
     this.proctoringService.getStudentProctoringStatus(this.selectedExam).subscribe({
       next: (students) => {
         console.log('Loaded student proctoring status:', students);
+        
+        // If no students returned, show empty state
+        if (!students || students.length === 0) {
+          this.students.set([]);
+          console.log('No students found for this exam');
+          return;
+        }
+        
         this.students.set(students);
+        
         // Attempt to connect to video streams for connected students
         students.forEach(student => {
           if (student.cameraConnected) {

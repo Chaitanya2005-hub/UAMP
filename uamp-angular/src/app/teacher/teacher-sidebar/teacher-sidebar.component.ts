@@ -40,6 +40,15 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
           <span class="nav-icon">📹</span>
           <span class="nav-text">Monitoring</span>
         </a>
+
+        <a
+          routerLink="/teacher/monitoring/live-proctoring"
+          routerLinkActive="active"
+          class="nav-item"
+        >
+          <span class="nav-icon">🎥</span>
+          <span class="nav-text">Live Proctoring</span>
+        </a>
       </nav>
 
       <div class="sidebar-footer">
