@@ -56,3 +56,5 @@ uamp-angular/node_modules/
 # Lock files (optional - can commit if desired)
 # package-lock.json
 # yarn.lock
+.vercel
+.env*
