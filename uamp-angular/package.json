@@ -13,7 +13,6 @@
     "test:ui": "vitest --ui"
   },
   "private": true,
-  "packageManager": "npm@11.16.0",
   "dependencies": {
     "@angular/animations": "^22.1.0",
     "@angular/cdk": "^22.1.1",
