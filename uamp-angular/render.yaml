@@ -7,6 +7,6 @@ services:
     publishDirectory: dist/uamp-angular
     envVars:
       - key: API_BASE_URL
-        value: https://uamp-backend.onrender.com/api
+        value: https://uamp.vercel.app/api
       - key: WEBSOCKET_URL
-        value: wss://uamp-backend.onrender.com/ws
+        value: wss://uamp.vercel.app/ws
