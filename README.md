@@ -90,11 +90,19 @@ docker-compose up --build
 # Backend API: http://localhost:3000
 ```
 
-### Option 3: Cloud Deployment (Render)
+### Option 3: Cloud Deployment (Vercel)
 ```bash
-# Deploy to Render cloud platform
+# Deploy to Vercel cloud platform
 # Follow DEPLOYMENT_GUIDE.md for detailed instructions
 # Repository: https://github.com/Chaitanya2005-hub/UAMP
+# Vercel configuration files included
+```
+
+### Option 4: Cloud Deployment (Render)
+```bash
+# Alternative: Deploy to Render cloud platform
+# Repository: https://github.com/Chaitanya2005-hub/UAMP
+# Render configuration files included
 ```
 
 ## 🔧 Configuration
@@ -145,6 +153,7 @@ UAMP/
 │   │   └── verify-students.js  # Verify student accounts
 │   ├── Dockerfile
 │   ├── render.yaml              # Render deployment config
+│   ├── vercel.json              # Vercel deployment config
 │   └── package.json
 ├── uamp-angular/                # Angular Frontend
 │   ├── src/
@@ -170,6 +179,7 @@ UAMP/
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   ├── render.yaml              # Render deployment config
+│   ├── vercel.json              # Vercel deployment config
 │   └── package.json
 ├── docker-compose.yml          # Docker orchestration
 ├── .docker.env                 # Docker environment variables

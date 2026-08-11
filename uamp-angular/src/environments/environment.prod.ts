@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiBaseUrl: '/api',
-  websocketUrl: '/ws',
+  apiBaseUrl: 'https://uamp-backend.vercel.app/api',
+  websocketUrl: 'wss://uamp-backend.vercel.app/ws',
 };

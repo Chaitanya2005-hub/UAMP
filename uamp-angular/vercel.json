@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "dist/uamp-angular",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "API_BASE_URL": "https://uamp-backend.vercel.app/api",
+    "WEBSOCKET_URL": "wss://uamp-backend.vercel.app/ws"
+  }
+}

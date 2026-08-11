@@ -6,6 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "build:prod": "ng build --configuration production",
+    "vercel-build": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -38,5 +39,9 @@
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
     "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }
