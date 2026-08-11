@@ -3,7 +3,7 @@ services:
     name: uamp-frontend
     env: static
     plan: free
-    buildCommand: npm run build
+    buildCommand: ng build --configuration production
     publishDirectory: dist/uamp-angular
     envVars:
       - key: API_BASE_URL
