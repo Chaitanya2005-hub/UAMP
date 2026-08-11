@@ -1,16 +1,29 @@
 # University Assessment and Mastery Portal (UAMP)
 
-A comprehensive examination platform with AI-powered proctoring, question paper management, and real-time monitoring capabilities.
+A comprehensive examination platform with AI-powered proctoring, question paper management, real-time monitoring, and multi-user support.
 
 ## 🎓 Features
 
-- **User Management**: Role-based access (Student, Teacher, Admin)
+### Core Features
+- **User Management**: Role-based access (Student, Teacher, Admin) with 14+ test accounts
 - **Question Paper Management**: Upload DOCX/PDF, manual MCQ builder, AI-generated questions
-- **Exam Scheduling**: Flexible exam creation with proctoring controls
+- **Exam Scheduling**: Flexible exam creation with proctoring controls and student assignment
 - **Real-time Proctoring**: Tab switch monitoring, webcam streaming, AI-powered surveillance
 - **Audit Trail**: Comprehensive logging of all critical actions
 - **Offline Support**: IndexedDB for exam runtime reliability
 - **Secure Authentication**: JWT-based auth with role permissions
+- **Multi-Browser Support**: Login from different browsers with separate sessions
+
+### Recent Enhancements (August 2026)
+- ✅ **Select All Students**: One-click student selection in exam scheduling
+- ✅ **Admin-Teacher Flow**: Teachers can see and manage exams created by admins
+- ✅ **Automatic Announcements**: System-wide notifications for new exam schedules
+- ✅ **Password Validation**: Clear error messages for wrong password/user not found
+- ✅ **Student Submit Button**: Fixed visibility and submission workflow
+- ✅ **Live Proctoring for Admins**: Admins can access live monitoring dashboard
+- ✅ **Focus Color Fix**: Purple accent colors instead of white rings
+- ✅ **WebSocket Server Fix**: Resolved WebSocket crash issues
+- ✅ **Multi-Browser Login**: Full support for concurrent logins from different browsers
 
 ## 🏗️ Architecture
 
@@ -21,6 +34,7 @@ A comprehensive examination platform with AI-powered proctoring, question paper 
 - TypeScript
 - TensorFlow.js (AI proctoring)
 - Dexie.js (IndexedDB storage)
+- WebRTC (Real-time video streaming)
 
 **Backend:**
 - Node.js + Express.js
@@ -33,11 +47,36 @@ A comprehensive examination platform with AI-powered proctoring, question paper 
 **DevOps:**
 - Docker & Docker Compose
 - Nginx (Reverse proxy)
+- Render (Cloud deployment platform)
 
 ## 🚀 Quick Start
 
-### Option 1: Docker (Recommended)
+### Prerequisites
+- Node.js 18+
+- Neon Database account
+- AWS S3 (or Neon storage) credentials (optional)
 
+### Option 1: Manual Setup (Recommended for Development)
+
+#### Backend Setup
+```bash
+cd server
+npm install
+cp .env.example .env
+# Update .env with your Neon and AWS credentials
+npm start
+```
+**Backend runs on:** `http://localhost:3000`
+
+#### Frontend Setup
+```bash
+cd uamp-angular
+npm install
+ng serve
+```
+**Frontend runs on:** `http://localhost:4200`
+
+### Option 2: Docker (Production)
 ```bash
 # Clone the repository
 git clone https://github.com/Chaitanya2005-hub/UAMP.git
@@ -51,41 +90,12 @@ docker-compose up --build
 # Backend API: http://localhost:3000
 ```
 
-### Option 2: Manual Setup
-
-#### Prerequisites
-- Node.js 18+
-- Neon Database account
-- AWS S3 (or Neon storage) credentials
-
-#### Backend Setup
-
+### Option 3: Cloud Deployment (Render)
 ```bash
-cd server
-npm install
-cp .env.example .env
-# Update .env with your Neon and AWS credentials
-npm start
+# Deploy to Render cloud platform
+# Follow DEPLOYMENT_GUIDE.md for detailed instructions
+# Repository: https://github.com/Chaitanya2005-hub/UAMP
 ```
-
-**Backend Dependencies:**
-- Express.js for HTTP server
-- WebSocket (ws) for WebRTC signaling
-- Neon PostgreSQL for database
-- JWT for authentication
-- AWS SDK for file storage
-
-Backend runs on `http://localhost:3000` with WebSocket support on the same port.
-
-#### Frontend Setup
-
-```bash
-cd uamp-angular
-npm install
-npm start
-```
-
-Frontend runs on `http://localhost:4200`
 
 ## 🔧 Configuration
 
@@ -109,7 +119,7 @@ S3_BUCKET_NAME=uamp-exam-storage
 ```typescript
 export const environment = {
   production: false,
-  apiBaseUrl: 'http://localhost:3000/api',
+  apiBaseUrl: '/api',  // Uses proxy in development
   websocketUrl: 'ws://localhost:3000/ws',
 };
 ```
@@ -124,119 +134,123 @@ UAMP/
 │   │   └── services/
 │   │       └── s3.service.js   # S3 file storage
 │   ├── scripts/
-│   │   ├── setup-test-data.js  # Database seeding
-│   │   ├── seed-demo-data.js   # Demo data seeding
 │   │   ├── add-new-courses.js  # Add new courses to database
-│   │   ├── verify-courses.js   # Verify courses in database
+│   │   ├── add-notifications.js  # Add notifications
+│   │   ├── add-question-paper-deadline.js  # Manage paper deadlines
 │   │   ├── create-students.js  # Create student accounts
+│   │   ├── seed-demo-data.js   # Demo data seeding
+│   │   ├── setup-exam-data.js   # Setup exam data
+│   │   ├── setup-test-data.js   # Setup test data
+│   │   ├── verify-courses.js   # Verify courses in database
 │   │   └── verify-students.js  # Verify student accounts
 │   ├── Dockerfile
+│   ├── render.yaml              # Render deployment config
 │   └── package.json
 ├── uamp-angular/                # Angular Frontend
 │   ├── src/
 │   │   ├── app/
-│   │   ├── auth/               # Authentication module
-│   │   ├── admin/              # Admin module
-│   │   ├── teacher/            # Teacher module
-│   │   ├── student/            # Student module
-│   │   ├── core/               # Core services
-│   │   └── shared/             # Shared components
+│   │   │   ├── auth/               # Authentication module
+│   │   │   ├── admin/              # Admin module
+│   │   │   │   ├── approvals/       # Question paper approvals
+│   │   │   │   ├── live-audit-dashboard/  # Live monitoring
+│   │   │   │   ├── intervention-controls/  # Proctoring controls
+│   │   │   │   └── manage-exams/     # Exam management
+│   │   │   ├── teacher/            # Teacher module
+│   │   │   │   ├── exam-schedule/    # Exam scheduling with select all
+│   │   │   │   ├── monitoring/       # Live proctoring
+│   │   │   │   ├── question-paper/  # Question paper management
+│   │   │   │   └── teacher-dashboard/  # Teacher dashboard
+│   │   │   ├── student/            # Student module
+│   │   │   │   ├── exam/             # Exam taking with submit button
+│   │   │   │   └── proctor-overlay/   # Camera streaming
+│   │   │   ├── core/               # Core services and interceptors
+│   │   │   └── shared/             # Shared components
+│   │   ├── environments/         # Environment configuration
+│   │   └── styles.scss           # Global styles with focus colors
 │   ├── Dockerfile
 │   ├── nginx.conf
+│   ├── render.yaml              # Render deployment config
 │   └── package.json
 ├── docker-compose.yml          # Docker orchestration
 ├── .docker.env                 # Docker environment variables
+├── DEPLOYMENT_GUIDE.md         # Cloud deployment instructions
+├── LOCAL_NETWORK_DEPLOYMENT.md # Local network testing guide
+├── RUNNING_GUIDE.md            # Quick start and troubleshooting
 └── README.md
 ```
 
 ## 🔐 Default Login Credentials
 
-After running the setup script (`node server/scripts/setup-test-data.js`):
-
-**Admin:**
+### Admin
 - Email: `admin@uamp.edu`
 - Password: `admin123`
 
-**Teacher:**
+### Teacher
 - Email: `teacher@uamp.edu`
 - Password: `teacher123`
 
-**Students:**
-- STU001 - Student User: `student@uamp.edu` / `student123`
-- STU002 - Priya Sharma: `priya.sharma@uamp.edu` / `priya123`
-- STU003 - Arjun Reddy: `arjun.reddy@uamp.edu` / `arjun123`
-- STU004 - Fatima Khan: `fatima.khan@uamp.edu` / `fatima123`
-- STU005 - Rahul Kumar: `rahul.kumar@uamp.edu` / `rahul123`
-- STU006 - Priya Singh: `priya.singh@uamp.edu` / `priya123`
-- STU007 - Amit Patel: `amit.patel@uamp.edu` / `amit123`
-- STU008 - Sneha Gupta: `sneha.gupta@uamp.edu` / `sneha123`
-- STU009 - Vikram Sharma: `vikram.sharma@uamp.edu` / `vikram123`
-- STU010 - Nisha Verma: `nisha.verma@uamp.edu` / `nisha123`
-- STU011 - Rohit Mehta: `rohit.mehta@uamp.edu` / `rohit123`
-- STU012 - Kavita Rani: `kavita.rani@uamp.edu` / `kavita123`
-- STU013 - Deepak Joshi: `deepak.joshi@uamp.edu` / `deepak123`
-- STU014 - Pooja Kumari: `pooja.kumari@uamp.edu` / `pooja123`
+### Students (14 Accounts)
+1. STU001 - Student User: `student@uamp.edu` / `student123`
+2. STU002 - Priya Sharma: `priya.sharma@uamp.edu` / `priya123`
+3. STU003 - Arjun Reddy: `arjun.reddy@uamp.edu` / `arjun123`
+4. STU004 - Fatima Khan: `fatima.khan@uamp.edu` / `fatima123`
+5. STU005 - Rahul Kumar: `rahul.kumar@uamp.edu` / `rahul123`
+6. STU006 - Priya Singh: `priya.singh@uamp.edu` / `priya123`
+7. STU007 - Amit Patel: `amit.patel@uamp.edu` / `amit123`
+8. STU008 - Sneha Gupta: `sneha.gupta@uamp.edu` / `sneha123`
+9. STU009 - Vikram Sharma: `vikram.sharma@uamp.edu` / `vikram123`
+10. STU010 - Nisha Verma: `nisha.verma@uamp.edu` / `nisha123`
+11. STU011 - Rohit Mehta: `rohit.mehta@uamp.edu` / `rohit123`
+12. STU012 - Kavita Rani: `kavita.rani@uamp.edu` / `kavita123`
+13. STU013 - Deepak Joshi: `deepak.joshi@uamp.edu` / `deepak123`
+14. STU014 - Pooja Kumari: `pooja.kumari@uamp.edu` / `pooja123`
 
-## 📊 Database Schema
+## 📊 Available Courses
 
-The application uses Neon PostgreSQL with 16 tables:
-
-- **Identity**: institutions, users, roles_permissions, user_permission_overrides
-- **Academic**: courses, question_papers, questions
-- **Exams**: exams, exam_slots, hall_tickets
-- **Submissions**: submissions, submission_answers
-- **Proctoring**: proctoring_logs, audit_trails
-- **Sessions**: active_sessions, notifications
-
-See `02-neon-database-schema.md` for complete schema details.
-
-## 🎯 Available API Endpoints
-
-### Authentication
-- `POST /api/auth/login` - User login
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/refresh` - Refresh JWT token
-
-### Courses
-- `GET /api/courses` - Get all courses
-
-**Available Courses:**
 - CS101 - Introduction to Computer Science
 - CS201 - Data Structures and Analysis
 - CS301 - Theory of Computation
 - CS401 - Angular Framework
 - CS402 - Advanced Java Programming
 
-### Question Papers
-- `GET /api/question-papers` - Get all question papers
-- `POST /api/question-papers` - Create question paper
+## 🎯 Key Features & Usage
 
-### Exams
-- `GET /api/exams` - Get all exams
+### Multi-Browser Login
+- **Chrome**: Login as admin for full system access
+- **Firefox**: Login as teacher for exam management
+- **Edge**: Login as student for exam taking
+- **Incognito**: Separate sessions for testing different roles
 
-### File Upload
-- `POST /api/upload/question-paper` - Upload question paper
-- `POST /api/upload/proctoring-snapshot` - Upload proctoring snapshot
-- `GET /api/files/presigned-url/:key` - Get download URL
+### Exam Scheduling with Select All
+- Navigate to Teacher → Schedule Exam
+- Fill in exam details (title, course, duration, etc.)
+- In "Assign Students" section, click "Select All" to assign all students at once
+- Click "Deselect All" to clear all selections
+- Individual selection still available
 
-### Proctoring
-- `POST /api/proctoring/events` - Log proctoring events
-- `WebSocket ws://localhost:3000/proctoring` - WebRTC signaling for video streaming
+### Admin-Teacher Collaboration
+- Admins can create exams that teachers can see and manage
+- Teachers can upload question papers for any exam they have access to
+- Automatic announcements notify all admins and teachers of new exams
+- Unified dashboard shows all relevant exams regardless of creator
 
-**WebSocket Connection:**
-- Student connection: `ws://localhost:3000/proctoring?submissionId={id}&examId={id}`
-- Teacher connection: `ws://localhost:3000/proctoring?examId={id}`
+### Live Proctoring System
+- **Student Side**: Camera and microphone capture during exams
+- **Teacher Side**: Live video feeds of all students during exams
+- **Admin Side**: Access to live proctoring dashboard
+- **WebRTC**: Real-time peer-to-peer video streaming
+- **WebSocket**: Signaling server for connection management
+
+### Improved Error Handling
+- **Login**: Clear messages for "Wrong password" vs "User not found"
+- **Form Validation**: Purple accent focus rings instead of white
+- **API Errors**: User-friendly error messages throughout
 
 ## 🧪 Testing
 
 ### Health Check
 ```bash
 curl http://localhost:3000/api/health
-```
-
-### List Database Tables
-```bash
-curl http://localhost:3000/api/tables
 ```
 
 ### Test Login
@@ -246,24 +260,52 @@ curl -X POST http://localhost:3000/api/auth/login \
   -d '{"email":"admin@uamp.edu","password":"admin123"}'
 ```
 
-## 🐳 Docker Commands
-
+### Test API Through Proxy
 ```bash
-# Build and start all services
-docker-compose up --build
-
-# Start in background
-docker-compose up -d
-
-# Stop all services
-docker-compose down
-
-# View logs
-docker-compose logs -f
-
-# Rebuild specific service
-docker-compose up -d --build backend
+curl http://localhost:4200/api/health
+curl -X POST http://localhost:4200/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@uamp.edu","password":"admin123"}'
 ```
+
+## 🌐 Deployment Options
+
+### Local Network Testing
+- Run servers locally with your local IP
+- Access from different devices on your network
+- Quick multi-device testing without cloud deployment
+- See `LOCAL_NETWORK_DEPLOYMENT.md` for details
+
+### Cloud Deployment (Render)
+- Free tier available for testing
+- HTTPS/SSL automatically configured
+- Public URL for remote access
+- See `DEPLOYMENT_GUIDE.md` for step-by-step instructions
+- Repository: https://github.com/Chaitanya2005-hub/UAMP
+
+### Docker Deployment
+- Production-ready containerized setup
+- Easy local deployment with `docker-compose up`
+- See existing `docker-compose.yml` for configuration
+
+## 📹 Live Video Streaming System
+
+The UAMP platform features a **real-time video streaming system** for exam proctoring using WebRTC technology.
+
+### Technical Implementation
+- **Student Portal**: WebRTC API for video/audio capture and streaming
+- **Backend**: WebSocket server for WebRTC signaling and connection management
+- **Teacher Dashboard**: Live video feeds of all students during exams
+- **Admin Dashboard**: Access to live proctoring monitoring
+- **Protocol**: WebRTC for P2P video streaming, WebSocket for signaling
+
+### Features
+- ✅ Real-time video streaming from students to teachers/admins
+- ✅ Multiple concurrent student video feeds
+- ✅ Connection status indicators for all participants
+- ✅ Automatic resource cleanup when connections end
+- ✅ Low latency peer-to-peer connections
+- ✅ Fixed WebSocket server crash issues
 
 ## 🔒 Security Features
 
@@ -274,13 +316,15 @@ docker-compose up -d --build backend
 - **SQL Injection Prevention**: Parameterized queries via Neon serverless
 - **Proctoring**: Tab switch monitoring, fullscreen guard, webcam streaming
 
-## 📱 User Roles
+## 📱 User Roles & Capabilities
 
 ### Admin
 - Approve/reject question papers
 - Monitor live audit dashboard
 - Control interventions during exams
 - View audit trails
+- Access live proctoring monitoring
+- Create exams visible to teachers
 
 ### Teacher
 - Create and manage question papers
@@ -289,130 +333,45 @@ docker-compose up -d --build backend
 - Generate questions with AI
 - Monitor student proctoring feeds
 - View incident timelines
+- Manage exams created by admins
+- Upload question papers for accessible exams
 
 ### Student
 - View exam dashboard
 - Access hall tickets
-- Take exams with proctoring
+- Take exams with proctoring and video streaming
 - View submission status
-- **Live Video Streaming**: Real-time webcam streaming during exams
+- Use enhanced submit button during exams
+- Real-time camera and microphone capture
 
-## 📹 Live Video Streaming System
+## 🎯 Recent Updates (August 2026)
 
-The UAMP platform now features a **real-time video streaming system** for exam proctoring using WebRTC technology.
+### New Features
+- ✅ **Select All Option**: One-click student selection in exam scheduling
+- ✅ **Admin-Teacher Collaboration**: Teachers can manage admin-created exams
+- ✅ **Automatic Announcements**: System-wide notifications for new exams
+- ✅ **Admin Live Proctoring**: Admins can access live monitoring dashboard
+- ✅ **Multi-Browser Login**: Full support for concurrent sessions
+- ✅ **Password Show/Hide**: Toggle password visibility in login form
+- ✅ **Focus Color Fix**: Purple accent colors throughout the application
 
-### **How It Works**
+### Bug Fixes
+- ✅ **Student Submit Button**: Fixed visibility and functionality
+- ✅ **WebSocket Server**: Resolved crash issues
+- ✅ **Focus Ring Colors**: Changed from white to purple accent
+- ✅ **Login Error Messages**: Clear validation feedback
+- ✅ **CORS Issues**: Fixed proxy configuration
+- ✅ **Environment Variables**: Corrected API URL handling
+- ✅ **Database Scripts**: Cleaned up test scripts, kept essential utilities
 
-1. **Student Portal**: When students start an exam, their camera and microphone are captured
-2. **WebRTC Connection**: Peer-to-peer connection established between student and teacher
-3. **WebSocket Signaling**: Server facilitates WebRTC signaling for connection establishment
-4. **Teacher Dashboard**: Teachers can view live video feeds of all students during exams
+### Documentation
+- ✅ **DEPLOYMENT_GUIDE.md**: Complete cloud deployment instructions
+- ✅ **LOCAL_NETWORK_DEPLOYMENT.md**: Local network testing guide
+- ✅ **RUNNING_GUIDE.md**: Quick start and troubleshooting
+- ✅ **render.yaml files**: Ready for Render deployment
+- ✅ **Updated README**: This comprehensive documentation
 
-### **Technical Implementation**
-
-- **Frontend**: WebRTC API for video/audio capture and streaming
-- **Backend**: WebSocket server for WebRTC signaling and connection management
-- **Protocol**: WebRTC for P2P video streaming, WebSocket for signaling
-- **NAT Traversal**: STUN servers for network connectivity across different networks
-
-### **Features**
-
-- ✅ **Real-time video streaming** from students to teachers
-- ✅ **Multiple concurrent streams** for different students
-- ✅ **Connection status indicators** for both students and teachers
-- ✅ **Automatic resource cleanup** when connections end
-- ✅ **ICE candidate handling** for NAT traversal
-- ✅ **Low latency** peer-to-peer connections
-
-### **Prerequisites**
-
-- Students must grant camera and microphone permissions
-- Teachers must have stable internet connection
-- Network must allow WebSocket connections (port 3000)
-- WebRTC must be supported by browser (modern browsers)
-
-### **Troubleshooting**
-
-**Camera not working:**
-- Check browser permissions for camera/microphone
-- Ensure HTTPS is used in production (required for WebRTC)
-- Verify firewall settings allow WebSocket connections
-
-**Video not showing for teacher:**
-- Ensure student has started the exam
-- Check WebSocket connection status in browser console
-- Verify student's camera is working locally
-- Check network connectivity between student and teacher
-
-## 🌐 Development
-
-### Running Manual Setup
-
-**Terminal 1 - Backend:**
-```bash
-cd server
-npm start
-```
-
-**Terminal 2 - Frontend:**
-```bash
-cd uamp-angular
-npm start
-```
-
-### Database Setup
-
-1. Create a Neon project at [console.neon.tech](https://console.neon.tech)
-2. Run the schema from `02-neon-database-schema.md`
-3. Run the setup script: `node server/scripts/setup-test-data.js`
-
-### Database Management Scripts
-
-The project includes several utility scripts for database management:
-
-```bash
-# Add new courses to the database
-node server/scripts/add-new-courses.js
-
-# Verify courses in the database
-node server/scripts/verify-courses.js
-
-# Create student accounts
-node server/scripts/create-students.js
-
-# Verify student accounts and credentials
-node server/scripts/verify-students.js
-
-# Seed demo data for testing
-node server/scripts/seed-demo-data.js
-```
-
-### 🎯 Recent Updates
-
-**August 2026:**
-- ✅ **Live Video Streaming**: Implemented real-time WebRTC video streaming for exam proctoring
-- ✅ **WebSocket Signaling**: Added WebSocket server for WebRTC connection management
-- ✅ **Student Video Capture**: Enhanced student portal to capture and stream camera/microphone
-- ✅ **Teacher Video Dashboard**: Updated teacher portal to receive and display live student video feeds
-- ✅ **WebRTC Integration**: Full peer-to-peer video streaming with proper signaling infrastructure
-- ✅ **Added new courses**: CS201 (Data Structures and Analysis), CS301 (Theory of Computation), CS401 (Angular Framework), CS402 (Advanced Java Programming)
-- ✅ **Created 10 new student accounts** with login credentials (STU005-STU014)
-- ✅ **Fixed exam starting issue** - students were stuck on "Starting..." 
-- ✅ **Improved exam lobby logic** to better detect admin-started exams
-- ✅ **Fixed question paper saving** and admin portal reflection issues
-- ✅ **Enhanced admin approvals component** with real API integration
-- ✅ **Added PATCH endpoint** for question paper approval/rejection workflow
-- ✅ **Fixed timetable issue** for exam starting with better server authority prioritization
-- ✅ **Added missing `/api/student/submissions` endpoint** for student submission history
-- ✅ **Fixed environment configuration** for proper API URL handling
-- ✅ **Updated CORS configuration** to support multiple frontend ports
-- ✅ **Fixed exam scheduling API parameter handling**
-- ✅ **Improved backend server startup** and error handling
-- ✅ **Fixed Angular build issues** with environment imports
-- ✅ **Removed unnecessary dependencies** from frontend package.json
-- ✅ **Configured Vitest** for testing with proper setup
-
-## 📝 Documentation
+## 📝 Additional Documentation
 
 - `01-system-architecture.md` - System architecture overview
 - `02-neon-database-schema.md` - Complete database schema
@@ -420,32 +379,43 @@ node server/scripts/seed-demo-data.js
 - `04-proctoring-security-engine.md` - Proctoring system details
 - `05-ui-ux-animation-guide.md` - UI/UX guidelines
 
-## 📋 August 2026 Updates Summary
+## 🆘 Troubleshooting
 
-### New Features
-- **Live Video Streaming System**: Real-time WebRTC video streaming for exam proctoring
-- **WebSocket Signaling Server**: Infrastructure for WebRTC connection management
-- **Student Camera Integration**: Enhanced proctor overlay with camera/microphone streaming
-- **Teacher Video Dashboard**: Live proctoring with real-time student video feeds
-- **4 New Courses Added**: CS201 (Data Structures), CS301 (Theory of Computation), CS401 (Angular), CS402 (Advanced Java)
-- **10 New Student Accounts**: STU005-STU014 with login credentials
-- **Database Management Scripts**: Utility scripts for course and student management
-- **Enhanced Question Paper Workflow**: Real-time approval/rejection system
+### Port Already in Use
+```bash
+# Windows
+netstat -ano | findstr :3000
+taskkill /F /PID <PID>
 
-### Bug Fixes
-- **Exam Starting Issue**: Fixed students stuck on "Starting..." with improved lobby logic
-- **Question Paper Saving**: Fixed immediate saving and admin portal reflection
-- **Timetable Issues**: Resolved exam scheduling time validation problems
-- **TypeScript Errors**: Fixed all compilation and build issues
-- **Video Streaming Issues**: Resolved teacher inability to see student footage
+# Or use different ports in .env files
+```
 
-### Documentation Updates
-- Complete student account credentials list
-- Enhanced README files with project details
-- Database management script documentation
-- Recent changes tracking
-- Video streaming system documentation
-- WebRTC integration details
+### Angular Commands Not Working
+```bash
+# Make sure you're in the right directory
+cd E:\UAMP\uamp-angular  # For Angular commands
+ng serve  # Correct
+ng build  # Correct
+
+# NOT from server directory
+cd E:\UAMP\server
+ng serve  # ERROR: Not an Angular project
+```
+
+### Database Connection Issues
+- Verify Neon connection string in `.env`
+- Check Neon project status at console.neon.tech
+- Ensure SSL mode is enabled in connection string
+
+### Build Errors
+- Clear Angular cache: `rm -rf node_modules/.angular`
+- Reinstall dependencies: `npm install`
+- Check Node.js version compatibility
+
+### WebSocket Issues
+- Ensure backend server is running on port 3000
+- Check firewall allows WebSocket connections
+- Verify WebSocket URL in environment configuration
 
 ## 🤝 Contributing
 
@@ -459,30 +429,10 @@ node server/scripts/seed-demo-data.js
 
 This project is licensed under the MIT License.
 
-## 🆘 Troubleshooting
-
-### Port Already in Use
-```bash
-# Windows
-netstat -ano | findstr :3000
-taskkill /F /PID <PID>
-
-# Or use different ports in .env files
-```
-
-### Database Connection Issues
-- Verify Neon connection string in `.env`
-- Check Neon project status at console.neon.tech
-- Ensure SSL mode is enabled in connection string
-
-### Build Errors
-- Clear Angular cache: `rm -rf node_modules/.angular`
-- Reinstall dependencies: `npm install`
-- Check Node.js version compatibility
-
 ## 🎓 Acknowledgments
 
 - Neon PostgreSQL for managed database
 - Angular framework for frontend
 - TensorFlow.js for AI proctoring
 - Dexie.js for IndexedDB storage
+- Render for cloud deployment platform
