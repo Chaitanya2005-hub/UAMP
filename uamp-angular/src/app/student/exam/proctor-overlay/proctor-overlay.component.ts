@@ -29,7 +29,7 @@ import { environment } from '../../../../environments/environment';
       position: fixed;
       bottom: 20px;
       right: 20px;
-      z-index: 900;
+      z-index: 100;
       border-radius: var(--uamp-radius-md);
       overflow: hidden;
       background: var(--uamp-bg-elevated);
@@ -37,6 +37,11 @@ import { environment } from '../../../../environments/environment';
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
       transition: all 280ms var(--uamp-ease-standard);
       width: 240px;
+      pointer-events: none;
+    }
+
+    .proctor-overlay > * {
+      pointer-events: auto;
     }
 
     .proctor-overlay.minimized {

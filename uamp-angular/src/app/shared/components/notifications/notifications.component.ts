@@ -253,7 +253,11 @@ export class NotificationsComponent implements OnInit {
       'approval_needed': 'icon-approval-needed',
       'approval_granted': 'icon-approval-granted',
       'approval_rejected': 'icon-approval-rejected',
-      'exam_reminder': 'icon-exam-reminder'
+      'exam_reminder': 'icon-exam-reminder',
+      'exam_scheduled': 'icon-exam-published',
+      'schedule': 'icon-exam-published',
+      'warning': 'icon-approval-needed',
+      'info': 'icon-default'
     };
     return iconMap[type] || 'icon-default';
   }
@@ -266,7 +270,11 @@ export class NotificationsComponent implements OnInit {
       'approval_needed': 'Approval Required',
       'approval_granted': 'Approval Granted',
       'approval_rejected': 'Approval Rejected',
-      'exam_reminder': 'Exam Reminder'
+      'exam_reminder': 'Exam Reminder',
+      'exam_scheduled': 'New Exam Scheduled',
+      'schedule': 'Exam Schedule Update',
+      'warning': 'Warning',
+      'info': 'Information'
     };
     return titleMap[type] || 'Notification';
   }

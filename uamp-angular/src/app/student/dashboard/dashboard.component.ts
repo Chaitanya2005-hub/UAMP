@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { GlassPanelComponent } from '../../shared/components/glass-panel/glass-panel.component';
 import { RadarChartComponent } from '../../shared/components/radar-chart/radar-chart.component';
+import { NotificationsComponent } from '../../shared/components/notifications/notifications.component';
 import { ExamService } from '../services/exam.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BloomMasteryPoint, ExamSlot } from '../../core/models';
@@ -10,12 +11,15 @@ import { BloomMasteryPoint, ExamSlot } from '../../core/models';
 @Component({
   selector: 'app-student-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, GlassPanelComponent, RadarChartComponent],
+  imports: [CommonModule, RouterLink, GlassPanelComponent, RadarChartComponent, NotificationsComponent],
   template: `
     <div class="container">
       <div class="page-header">
         <h1>Welcome back, {{ userName() }} 👋</h1>
         <p>Your exam timetable, alerts, and active assessments.</p>
+        <div class="notifications-wrapper">
+          <app-notifications></app-notifications>
+        </div>
       </div>
 
       <!-- Stats Grid -->
@@ -121,6 +125,17 @@ import { BloomMasteryPoint, ExamSlot } from '../../core/models';
     </div>
   `,
   styles: [`
+    .page-header {
+      position: relative;
+    }
+
+    .notifications-wrapper {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 100;
+    }
+
     .stats-grid {
       margin-bottom: 32px;
     }

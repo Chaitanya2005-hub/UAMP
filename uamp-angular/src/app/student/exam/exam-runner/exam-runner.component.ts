@@ -35,15 +35,13 @@ import { environment } from '../../../../environments/environment';
           <button 
             class="btn btn-danger btn-sm" 
             (click)="submitExam()"
-            [disabled]="!isExamReady || isSubmitted"
-            *ngIf="!isSubmitted">
+            [disabled]="isSubmitted"
+            *ngIf="!isSubmitted"
+            style="pointer-events: auto !important; position: relative !important; z-index: 1000 !important; cursor: pointer !important; opacity: 1 !important;">
             Submit
           </button>
           <span class="submit-status" *ngIf="isSubmitted">
             ✅ Submitted
-          </span>
-          <span class="loading-status" *ngIf="!isExamReady">
-            ⏳ Loading...
           </span>
         </div>
       </div>
@@ -75,10 +73,10 @@ import { environment } from '../../../../environments/environment';
             (answerChanged)="onAnswerChanged($event)"
           />
           <div class="question-actions">
-            <button class="btn btn-secondary" (click)="prevQuestion()" [disabled]="currentIndex() === 0">
+            <button class="btn btn-secondary" (click)="prevQuestion()" [disabled]="currentIndex() === 0" style="pointer-events: auto !important; position: relative !important; z-index: 10 !important;">
               ← Previous
             </button>
-            <button class="btn btn-primary" (click)="nextQuestion()" [disabled]="currentIndex() === questions().length - 1">
+            <button class="btn btn-primary" (click)="nextQuestion()" [disabled]="currentIndex() === questions().length - 1" style="pointer-events: auto !important; position: relative !important; z-index: 10 !important;">
               Next →
             </button>
           </div>
@@ -132,7 +130,9 @@ import { environment } from '../../../../environments/environment';
     .exam-topbar-right {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
+      position: relative;
+      z-index: 2000;
     }
 
     .sync-indicator {
@@ -287,10 +287,14 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
           this.endTime.set(new Date(exam.scheduledEnd));
         });
 
+        // Enter fullscreen mode for anti-proctoring
+        this.enterFullscreen();
+
         this.startAutosave();
         this.startSync();
         this.startTimer();
         this.startTabSwitchDetection();
+        this.startWebSocketListener();
         
         // Mark exam as ready
         this.isExamReady = true;
@@ -327,10 +331,25 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
   }
 
   submitExam(): void {
+    console.log('Submit button clicked, isExamReady:', this.isExamReady, 'isSubmitted:', this.isSubmitted, 'submissionId:', this.submissionId);
+    
+    if (this.isSubmitted) {
+      console.error('Cannot submit: Already submitted');
+      return;
+    }
+    
+    if (!this.submissionId) {
+      console.error('Cannot submit: No submission ID');
+      alert('No active submission found. Please refresh and try again.');
+      return;
+    }
+
     if (!confirm('Are you sure you want to submit? You cannot undo this action.')) return;
 
+    console.log('Submitting exam with submissionId:', this.submissionId);
     this.examService.submitExam(this.submissionId).subscribe({
-      next: () => {
+      next: (response) => {
+        console.log('Submit successful:', response);
         this.isSubmitted = true;
         this.submissionInProgress = false;
         this.router.navigate(['/student/exam', this.examId, 'submitted']);
@@ -408,6 +427,52 @@ export class ExamRunnerComponent implements OnInit, OnDestroy {
     }).catch(error => {
       console.error('Failed to report tab switch:', error);
     });
+  }
+
+  private enterFullscreen(): void {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+      } else if ((document.documentElement as any).webkitRequestFullscreen) {
+        (document.documentElement as any).webkitRequestFullscreen();
+      } else if ((document.documentElement as any).msRequestFullscreen) {
+        (document.documentElement as any).msRequestFullscreen();
+      }
+    } catch (error) {
+      console.error('Failed to enter fullscreen:', error);
+    }
+  }
+
+  private startWebSocketListener(): void {
+    const ws = new WebSocket(`${environment.websocketUrl}/proctoring?submissionId=${this.submissionId}&examId=${this.examId}`);
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'warning') {
+          // Show warning from teacher/admin
+          alert(`⚠️ Warning from Teacher: ${message.message || 'Please focus on your exam.'}`);
+        } else if (message.type === 'force_submit') {
+          // Force submit from teacher
+          alert('Your exam has been force submitted by the teacher.');
+          this.examService.submitExam(this.submissionId, { reason: 'Teacher intervention' }).subscribe(() => {
+            this.isSubmitted = true;
+            this.router.navigate(['/student/exam', this.examId, 'submitted']);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
   }
 
   ngOnDestroy(): void {

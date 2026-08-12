@@ -13,7 +13,7 @@ import { Router } from '@angular/router';
       <div class="dashboard-header">
         <h2>Live Audit Dashboard</h2>
         <div class="header-controls">
-          <select class="exam-select" [(ngModel)]="selectedExam">
+          <select class="exam-select" [(ngModel)]="selectedExam" (change)="onExamChange()">
             <option value="">All Active Exams</option>
             <option *ngFor="let exam of activeExams" [value]="exam.id">
               {{ exam.title }} - {{ exam.course }}
@@ -108,29 +108,30 @@ import { Router } from '@angular/router';
           </div>
         </div>
 
-        <div class="exam-list">
-          <h3>Active Exams</h3>
-          <div class="exam-item" *ngFor="let exam of activeExams">
-            <div class="exam-info">
-              <h4>{{ exam.title }}</h4>
-              <span class="exam-course">{{ exam.course }}</span>
-            </div>
-            <div class="exam-progress">
-              <div class="progress-bar">
-                <div class="progress-fill" [style.width.%]="exam.progress"></div>
+        <div class="student-status-section">
+          <h3>Student Status</h3>
+          <div class="student-list" *ngIf="selectedExamStudents.length > 0; else noStudents">
+            <div class="student-item" 
+                 *ngFor="let student of selectedExamStudents"
+                 [class.student-online]="student.isLive"
+                 [class.student-offline]="!student.isLive">
+              <div class="student-info">
+                <span class="student-name">{{ student.studentName }}</span>
+                <span class="student-id">{{ student.enrollmentNumber }}</span>
               </div>
-              <span class="progress-text">{{ exam.progress }}% complete</span>
-            </div>
-            <div class="exam-actions">
-              <button class="btn-view" (click)="viewExamDetails(exam)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-                View
-              </button>
+              <div class="student-status">
+                <span class="status-badge" [class.status-online]="student.isLive" [class.status-offline]="!student.isLive">
+                  {{ student.isLive ? '🟢 Online' : '🔴 Offline' }}
+                </span>
+                <span class="exam-status">{{ student.status }}</span>
+              </div>
             </div>
           </div>
+          <ng-template #noStudents>
+            <div class="no-students">
+              <p>Select an exam to view student status</p>
+            </div>
+          </ng-template>
         </div>
       </div>
     </div>
@@ -403,11 +404,99 @@ import { Router } from '@angular/router';
       width: 18px;
       height: 18px;
     }
+
+    .student-status-section {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .student-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .student-item {
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .student-item.student-online {
+      border-left: 3px solid #34d399;
+    }
+
+    .student-item.student-offline {
+      border-left: 3px solid #f87171;
+      opacity: 0.6;
+    }
+
+    .student-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .student-name {
+      color: #e6ebf5;
+      font-weight: 600;
+      font-size: 0.9375rem;
+    }
+
+    .student-id {
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+
+    .student-status {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      align-items: flex-end;
+    }
+
+    .status-badge {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .status-badge.status-online {
+      background: rgba(52, 211, 153, 0.2);
+      color: #34d399;
+    }
+
+    .status-badge.status-offline {
+      background: rgba(248, 113, 113, 0.2);
+      color: #f87171;
+    }
+
+    .exam-status {
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+
+    .no-students {
+      text-align: center;
+      padding: 32px;
+      color: #94a3b8;
+    }
   `]
 })
 export class LiveAuditDashboardComponent implements OnInit {
   selectedExam = '';
   activeExams: any[] = [];
+  selectedExamStudents: any[] = [];
   stats = {
     activeStudents: 0, warnings: 0, critical: 0, completed: 0
   };
@@ -423,6 +512,34 @@ export class LiveAuditDashboardComponent implements OnInit {
     this.http.get<any[]>('/api/exams/active').subscribe(exams => this.activeExams = exams.map(exam => ({ ...exam, progress: 0 })));
     this.http.get<any>('/api/admin/dashboard/stats').subscribe(stats => this.stats = stats);
     this.http.get<any[]>('/api/admin/dashboard/activity').subscribe(rows => this.recentActivities = rows.map(row => ({ ...row, time: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })));
+    
+    // Load student status if exam is selected
+    if (this.selectedExam) {
+      this.loadStudentStatus();
+    }
+  }
+
+  onExamChange(): void {
+    if (this.selectedExam) {
+      this.loadStudentStatus();
+    } else {
+      this.selectedExamStudents = [];
+    }
+  }
+
+  loadStudentStatus(): void {
+    const token = localStorage.getItem('auth_token');
+    this.http.get<any[]>(`/api/proctoring/exam/${this.selectedExam}/students`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).subscribe({
+      next: (students) => {
+        this.selectedExamStudents = students;
+      },
+      error: (error) => {
+        console.error('Failed to load student status:', error);
+        this.selectedExamStudents = [];
+      }
+    });
   }
 
   viewExamDetails(exam: any): void {

@@ -96,6 +96,8 @@ a {
   box-shadow: var(--uamp-glass-shadow);
   transition: transform var(--uamp-duration-base) var(--uamp-ease-standard),
               box-shadow var(--uamp-duration-base) var(--uamp-ease-standard);
+  position: relative;
+  z-index: 0;
 }
 
 .glass-panel:hover {
@@ -180,6 +182,9 @@ a {
   font-weight: 500;
   cursor: pointer;
   transition: all var(--uamp-duration-fast) var(--uamp-ease-standard);
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .btn-primary {

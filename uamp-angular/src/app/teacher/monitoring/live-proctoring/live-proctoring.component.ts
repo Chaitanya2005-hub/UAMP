@@ -562,6 +562,8 @@ export class LiveProctoringComponent implements OnInit {
 
   async connectToStudentVideo(submissionId: string): Promise<void> {
     try {
+      console.log('[Teacher] Attempting to connect to student video:', submissionId);
+      
       // Create WebRTC peer connection for receiving student stream
       const peerConnection = new RTCPeerConnection({
         iceServers: [
@@ -594,33 +596,45 @@ export class LiveProctoringComponent implements OnInit {
       };
 
       ws.onmessage = async (event) => {
-        const message = JSON.parse(event.data);
-        
-        if (message.type === 'offer' && message.submissionId === submissionId) {
-          // Handle WebRTC offer from student
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(message.sdp));
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
+        try {
+          const message = JSON.parse(event.data);
+          console.log('[Teacher] Received WebSocket message:', message.type, 'for student:', message.submissionId);
           
-          ws.send(JSON.stringify({
-            type: 'answer',
-            sdp: answer,
-            submissionId: submissionId,
-            examId: this.selectedExam
-          }));
-        } else if (message.type === 'ice-candidate' && message.submissionId === submissionId) {
-          // Handle ICE candidates
-          await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+          if (message.type === 'offer' && message.submissionId === submissionId) {
+            // Handle WebRTC offer from student
+            console.log('[Teacher] Received WebRTC offer from student');
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(message.sdp));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            
+            ws.send(JSON.stringify({
+              type: 'answer',
+              sdp: answer,
+              submissionId: submissionId,
+              examId: this.selectedExam
+            }));
+          } else if (message.type === 'ice-candidate' && message.submissionId === submissionId) {
+            // Handle ICE candidates
+            console.log('[Teacher] Received ICE candidate');
+            await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+          }
+        } catch (error) {
+          console.error('[Teacher] Error processing WebSocket message:', error);
         }
       };
 
       // Handle incoming stream
       peerConnection.ontrack = (event) => {
+        console.log('[Teacher] Received video track:', event);
         if (event.streams && event.streams[0]) {
           // Find the correct video element for this student
           const videoElement = document.querySelector(`[data-submission-id="${submissionId}"] video`) as HTMLVideoElement;
           if (videoElement) {
+            console.log('[Teacher] Setting video source for student:', submissionId);
             videoElement.srcObject = event.streams[0];
+            videoElement.play().catch(e => console.error('[Teacher] Failed to play video:', e));
+          } else {
+            console.error('[Teacher] Video element not found for student:', submissionId);
           }
         }
       };
@@ -638,8 +652,12 @@ export class LiveProctoringComponent implements OnInit {
         }
       };
 
+      peerConnection.onconnectionstatechange = () => {
+        console.log('[Teacher] WebRTC connection state:', peerConnection.connectionState);
+      };
+
     } catch (error) {
-      console.error('Failed to connect to student video:', error);
+      console.error('[Teacher] Failed to connect to student video:', error);
     }
   }
 

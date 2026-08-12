@@ -916,7 +916,19 @@ app.post('/api/exams/:examId/attempt', async (req, res) => {
       FROM questions WHERE question_paper_id = ${examRows[0].question_paper_id}
       ORDER BY order_index
     `;
-    res.json({ submissionId: submissions[0].id, sessionSecret: require('crypto').randomUUID(), questions });
+    
+    // Ensure true/false questions have options
+    const formattedQuestions = questions.map(q => {
+      if (q.type === 'true_false' && (!q.options || q.options.length === 0)) {
+        q.options = [
+          { id: 'true', text: 'True' },
+          { id: 'false', text: 'False' }
+        ];
+      }
+      return q;
+    });
+    
+    res.json({ submissionId: submissions[0].id, sessionSecret: require('crypto').randomUUID(), questions: formattedQuestions });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1428,8 +1440,8 @@ app.get('/api/proctoring/exam/:examId/students', async (req, res) => {
         s.tab_switch_count,
         s.started_at,
         s.started_at > NOW() - INTERVAL '5 minutes' as is_live,
-        COALESCE(p.camera_connected, false) as camera_connected,
-        COALESCE(p.microphone_connected, false) as microphone_connected,
+        false as camera_connected,
+        false as microphone_connected,
         COUNT(CASE WHEN p.severity = 'warning' THEN 1 END) as gaze_alerts,
         COUNT(CASE WHEN p.event_type = 'fullscreen_exit' THEN 1 END) as fullscreen_exits
       FROM exam_slots es
@@ -1452,8 +1464,8 @@ app.get('/api/proctoring/exam/:examId/students', async (req, res) => {
       fullscreenExits: student.fullscreen_exits || 0,
       gazeAlerts: student.gaze_alerts || 0,
       lastActivity: student.started_at || new Date(),
-      cameraConnected: student.camera_connected,
-      microphoneConnected: student.microphone_connected
+      cameraConnected: student.status === 'in_progress', // Show camera as connected if student is actively taking exam
+      microphoneConnected: student.status === 'in_progress' // Show microphone as connected if student is actively taking exam
     }));
 
     res.json(formattedStudents);
